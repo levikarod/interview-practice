@@ -1,0 +1,193 @@
+{
+  "name": "Mara Okonjo",
+  "headline": "Backend Engineer",
+  "summary": "Backend engineer, 7 years, mostly Python and Go in payments and logistics. Spent three years on a card-payments platform where correctness under retry was the whole job, then two years at a logistics startup owning the dispatch pipeline.",
+  "roles": [
+    {
+      "id": "vanta-pay-senior-backend-engineer",
+      "title": "Senior Backend Engineer",
+      "org": "Vanta Pay",
+      "dates": "2022 - Present",
+      "scope": "",
+      "bullets": [
+        {
+          "id": "vanta-idempotency-keys",
+          "text": "Designed idempotency keys for the authorisation API so a retried request never double-charges, replacing a client-side deduplication scheme that leaked.",
+          "skills": [
+            "idempotency",
+            "API design",
+            "PostgreSQL",
+            "distributed systems"
+          ],
+          "aliases": [
+            "exactly-once",
+            "deduplication",
+            "retries",
+            "at-least-once",
+            "safe retries",
+            "payment correctness",
+            "race conditions"
+          ],
+          "metric": null,
+          "metric_sourced": true
+        },
+        {
+          "id": "vanta-double-charge-incident",
+          "text": "Led the postmortem on a double-charge incident affecting 1,400 customers, tracing it to a retry path that bypassed the ledger's uniqueness constraint.",
+          "skills": [
+            "incident response",
+            "postmortems",
+            "PostgreSQL",
+            "observability"
+          ],
+          "aliases": [
+            "outage",
+            "incident",
+            "postmortem",
+            "production bug",
+            "on-call",
+            "root cause",
+            "failure story",
+            "customer impact"
+          ],
+          "metric": "1,400 customers",
+          "metric_sourced": true
+        },
+        {
+          "id": "vanta-ledger-partitioning",
+          "text": "Partitioned the ledger table by month after write latency degraded past 200ms at the p99, keeping query plans stable as the table crossed 400M rows.",
+          "skills": [
+            "PostgreSQL",
+            "partitioning",
+            "query performance",
+            "capacity planning"
+          ],
+          "aliases": [
+            "database scaling",
+            "sharding",
+            "partitioning",
+            "p99 latency",
+            "query optimization",
+            "large tables",
+            "performance tuning"
+          ],
+          "metric": "200ms p99, 400M rows",
+          "metric_sourced": false
+        },
+        {
+          "id": "vanta-fraud-vendor-migration",
+          "text": "Migrated the fraud-scoring vendor behind an adapter interface, so swapping providers took a config change rather than a rewrite of the auth path.",
+          "skills": [
+            "adapter pattern",
+            "vendor migration",
+            "API design",
+            "Go"
+          ],
+          "aliases": [
+            "third-party integration",
+            "vendor lock-in",
+            "abstraction layer",
+            "provider swap",
+            "interface design",
+            "decoupling"
+          ],
+          "metric": null,
+          "metric_sourced": true
+        }
+      ],
+      "tech": [
+        "Python",
+        "Go",
+        "PostgreSQL",
+        "Kafka",
+        "Redis",
+        "Docker",
+        "Kubernetes",
+        "AWS",
+        "Datadog"
+      ]
+    },
+    {
+      "id": "rota-logistics-backend-engineer",
+      "title": "Backend Engineer",
+      "org": "Rota Logistics",
+      "dates": "2020 - 2022",
+      "scope": "",
+      "bullets": [
+        {
+          "id": "rota-queue-backpressure",
+          "text": "Added backpressure to the dispatch queue after a Black Friday backlog, so the system shed load predictably instead of timing out across the board.",
+          "skills": [
+            "queues",
+            "backpressure",
+            "RabbitMQ",
+            "load shedding",
+            "Python"
+          ],
+          "aliases": [
+            "rate limiting",
+            "throttling",
+            "load shedding",
+            "queue depth",
+            "flow control",
+            "overload",
+            "scaling",
+            "peak traffic",
+            "capacity"
+          ],
+          "metric": null,
+          "metric_sourced": true
+        },
+        {
+          "id": "rota-oncall-rotation",
+          "text": "Set up the on-call rotation and runbooks for a team that had none, cutting mean time to acknowledge from hours to under ten minutes.",
+          "skills": [
+            "on-call",
+            "runbooks",
+            "incident process",
+            "team process"
+          ],
+          "aliases": [
+            "on-call",
+            "operations",
+            "SRE",
+            "process improvement",
+            "documentation",
+            "team leadership",
+            "MTTA",
+            "reliability culture"
+          ],
+          "metric": "hours to under ten minutes",
+          "metric_sourced": false
+        }
+      ],
+      "tech": [
+        "Python",
+        "RabbitMQ",
+        "PostgreSQL",
+        "Redis",
+        "Terraform",
+        "GCP"
+      ]
+    }
+  ],
+  "skills": [
+    "Python",
+    "Go",
+    "REST APIs",
+    "event-driven systems",
+    "background workers",
+    "PostgreSQL",
+    "Redis",
+    "Kafka",
+    "RabbitMQ",
+    "Docker",
+    "Kubernetes",
+    "Terraform",
+    "AWS",
+    "GCP",
+    "Datadog",
+    "English (native)",
+    "Portuguese (B2)"
+  ]
+}

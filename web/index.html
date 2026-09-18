@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interview Practice</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <h1>Interview Practice</h1>
+  <p class="sub">Answer out loud. Get told what you had and didn't say.</p>
+</header>
+
+<div id="sample-banner" class="banner" hidden>
+  <strong>Sample data.</strong>
+  You're practising against a fictional engineer's CV.
+  <a href="/setup">Add your own CV</a> to make the feedback about you.
+</div>
+
+<div id="ingest-banner" class="banner" hidden>
+  <strong>Setup unfinished.</strong>
+  Found your <code>cv.md</code>, but nothing has been derived from it yet —
+  so there are no stories to check your answers against.
+  <a href="/setup">Finish setup</a> to build the story bank.
+</div>
+
+<main>
+  <section class="card">
+    <h2>Profile</h2>
+    <dl id="profile-summary"><dd class="muted">Loading…</dd></dl>
+  </section>
+
+  <section class="card">
+    <h2>Story bank</h2>
+    <p class="muted" id="story-progress"></p>
+    <ul id="story-list"></ul>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

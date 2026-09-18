@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# Your real material. Never committed.
+#
+# profile/ holds your CV, your stories and your guardrails. That is personal
+# data: phone numbers, employer detail, and candid notes you would not publish.
+# The repo ships profile.example/ instead, which is fictional and safe.
+#
+# If you are reading this because you want to share your profile with someone:
+# don't do it by committing. Send the files.
+# ---------------------------------------------------------------------------
+profile/
+
+# Runtime state: recorded audio, the SQLite db, the empty LLM sandbox cwd.
+runtime/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Whisper model weights, if cached in-tree
+models/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets
+.env
+.env.*
+!.env.example
