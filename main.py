@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
-from core import profile_store, questions, runs, transcribe
+from core import db, profile_store, questions, runs, transcribe
 from core.profile_store import ProfileNotSetUp
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -130,6 +130,15 @@ async def run_events(run_id: str) -> EventSourceResponse:
             yield {"data": json.dumps(event)}
 
     return EventSourceResponse(stream())
+
+
+@app.get("/api/history")
+def get_history(question_id: str = "", limit: int = 20) -> dict:
+    """Past answers, newest first. Filter by question to watch one improve."""
+    return {
+        "runs": db.history(question_id or None, limit),
+        "totals": db.totals(),
+    }
 
 
 @app.get("/")

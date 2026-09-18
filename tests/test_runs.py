@@ -15,6 +15,30 @@ from core import questions, runs
 from core.schemas import Transcript, Word
 
 
+@pytest.fixture(autouse=True)
+def fake_analysis(monkeypatch):
+    """Stub the analysis call. These tests cover orchestration, not the model."""
+    from core.llm import Completion
+    from core.schemas import Feedback, StarCoverage
+
+    feedback = Feedback(
+        missed_points=[], risky_claims=[], strengths=["clear"], fixes=["tighten it"],
+        star_coverage=StarCoverage(situation=True, task=False, action=True,
+                                   result=True, reflection=False),
+    )
+    monkeypatch.setattr(
+        runs.analyze_mod, "analyse",
+        lambda *a, **k: (feedback, Completion(cost_usd=0.21, model="fake")),
+    )
+    return feedback
+
+
+@pytest.fixture(autouse=True)
+def isolated_db(monkeypatch, tmp_path):
+    """Each test writes to its own database file, not runtime/app.db."""
+    monkeypatch.setattr(runs.db, "DB_PATH", tmp_path / "test.db")
+
+
 @pytest.fixture
 def fake_transcribe(monkeypatch):
     """Replace transcription with a canned result."""
@@ -41,6 +65,8 @@ class TestPipeline:
         assert run.stage == "done"
         assert run.transcript.text.startswith("I added")
         assert run.metrics.word_count == 10
+        assert run.feedback is not None
+        assert run.cost_usd == 0.21
 
     async def test_done_event_reports_the_done_stage(self, fake_transcribe, tmp_path):
         """The snapshot used to be built before the stage was set, so the 'done'

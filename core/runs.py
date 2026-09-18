@@ -27,13 +27,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, AsyncIterator
 
+from core import analyze as analyze_mod
 from core import metrics as metrics_mod
-from core import profile_store, questions, transcribe
-from core.schemas import AnswerMetrics, Transcript
+from core import db, profile_store, questions, transcribe
+from core.schemas import AnswerMetrics, Feedback, Transcript
 
 MAX_FINISHED_RUNS = 20
 
-STAGES = ("queued", "transcribing", "measuring", "done", "error")
+STAGES = ("queued", "transcribing", "measuring", "analysing", "done", "error")
 
 
 @dataclass
@@ -44,6 +45,8 @@ class Run:
     stage: str = "queued"
     transcript: Transcript | None = None
     metrics: AnswerMetrics | None = None
+    feedback: Feedback | None = None
+    cost_usd: float = 0.0
     error: str | None = None
     started_at: float = field(default_factory=time.time)
     finished_at: float | None = None
@@ -57,6 +60,8 @@ class Run:
             "error": self.error,
             "transcript": self.transcript.model_dump() if self.transcript else None,
             "metrics": self.metrics.model_dump() if self.metrics else None,
+            "feedback": self.feedback.model_dump() if self.feedback else None,
+            "cost_usd": round(self.cost_usd, 4),
             "elapsed_s": round((self.finished_at or time.time()) - self.started_at, 1),
         }
 
@@ -121,6 +126,15 @@ async def process(run: Run) -> None:
         await _set_stage(run, "measuring")
         run.metrics = metrics_mod.measure(transcript, limit)
 
+        if question is not None:
+            await _set_stage(run, "analysing")
+            feedback, completion = await asyncio.to_thread(
+                analyze_mod.analyse, question, transcript
+            )
+            run.feedback = feedback
+            run.cost_usd = completion.cost_usd
+
+        db.save_run(run)
         await _set_stage(run, "done")
     except Exception as exc:
         run.error = str(exc)

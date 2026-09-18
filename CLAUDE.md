@@ -106,9 +106,14 @@ Fixtures come from `profile.example/`, never from `profile/`.
 
 ## Cost, for context when changing the prompt
 
-A call costs ~$0.17 and ~40K tokens on Opus 5 in steady state. Only ~3–5K of that
-is our payload; the rest is Claude Code's own scaffolding, which cannot be
-stripped from outside the CLI. Consequence: **trimming our prompt saves less than
-you would expect.** The raw-API backend skips that overhead entirely and is
-roughly 10x cheaper per call — it costs dollars instead of rate limits, which is
-the actual tradeoff between the two backends.
+An analysis call costs about $0.24 on Opus 5. Measured breakdown: ~20K
+cache-write and ~28K cache-read of Claude Code scaffolding against ~3.2K of our
+own content, billed per turn across two turns.
+
+Consequence: **trimming our prompt saves less than you would expect** — our
+content is about 3% of the call. If you want it cheaper, the levers are the
+backend or the model, not the payload.
+
+The raw-API backend skips the scaffolding and costs roughly $0.04 for the same
+work, about 4x less. It is not 10x: output tokens dominate once the response is
+real, and both backends pay those.

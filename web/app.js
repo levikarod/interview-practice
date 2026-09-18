@@ -11,6 +11,7 @@ const STAGE_LABEL = {
   queued: "Queued…",
   transcribing: "Transcribing locally…",
   measuring: "Measuring delivery…",
+  analysing: "Checking against your stories…",
   done: "Done",
   error: "Something went wrong",
 };
@@ -159,7 +160,7 @@ async function uploadAnswer() {
 
 function markStage(stage) {
   $("#stage-label").textContent = STAGE_LABEL[stage] || stage;
-  const order = ["transcribing", "measuring", "done"];
+  const order = ["transcribing", "measuring", "analysing", "done"];
   const at = order.indexOf(stage);
   document.querySelectorAll(".stages li").forEach((li) => {
     const i = order.indexOf(li.dataset.stage);
@@ -196,9 +197,19 @@ function watchRun(runId) {
   };
 }
 
+const esc = (s) => String(s ?? "").replace(/[&<>]/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+function fillList(sectionId, listId, items, render) {
+  const has = items && items.length;
+  show(sectionId, !!has);
+  if (has) $(listId).innerHTML = items.map(render).join("");
+}
+
 function showResult(run) {
   state.asked.push(run.question_id);
   const m = run.metrics || {};
+  const fb = run.feedback;
 
   $("#result-question").textContent = state.question.text;
   $("#transcript").textContent = run.transcript?.text || "";
@@ -211,6 +222,25 @@ function showResult(run) {
     ["Longest pause", m.longest_pause_s ? `${m.longest_pause_s}s` : "—"],
   ].map(([k, v]) => `<div class="stat"><span class="k">${k}</span><span class="v">${v}</span></div>`)
    .join("");
+
+  fillList("#fb-missed", "#missed", fb?.missed_points,
+    (p) => `<li>${esc(p.point)} <span class="src">${esc(p.source_story_id)}</span></li>`);
+
+  fillList("#fb-risky", "#risky", fb?.risky_claims,
+    (r) => `<li><q>${esc(r.quote)}</q><span class="why">${esc(r.why)}</span></li>`);
+
+  fillList("#fb-fixes", "#fixes", fb?.fixes, (f) => `<li>${esc(f)}</li>`);
+  fillList("#fb-strengths", "#strengths", fb?.strengths, (s) => `<li>${esc(s)}</li>`);
+
+  if (fb?.star_coverage) {
+    const missing = Object.entries(fb.star_coverage)
+      .filter(([, hit]) => !hit).map(([k]) => k);
+    $("#star").textContent = missing.length
+      ? `Didn't cover: ${missing.join(", ")}.`
+      : "Covered situation, task, action, result and reflection.";
+  } else {
+    $("#star").textContent = "";
+  }
 
   panel("#result");
 }

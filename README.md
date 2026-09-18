@@ -15,9 +15,9 @@ stories, and your guardrails all live on disk as Markdown you can edit.
 
 ## Status
 
-Being built in phases. You can record an answer and get it transcribed; **the
-feedback step is not wired up yet**, so you get your own words and delivery
-stats back, not yet an analysis. What runs today:
+Being built in phases, and the core loop works end to end: record an answer, get
+it transcribed locally, and get back what you had in your own material and didn't
+say. What runs today:
 
 | | |
 |---|---|
@@ -26,8 +26,9 @@ stats back, not yet an analysis. What runs today:
 | ✅ | Guardrails: flags CV figures with nothing behind them |
 | ✅ | Sample profile so the app runs with zero setup |
 | ✅ | Record against a hard-stop timer, transcribe locally, measure delivery |
-| ⬜ | Retrieval + feedback — the point of the whole thing |
-| ⬜ | AI-proposed story patches |
+| ✅ | Retrieval, feedback, and per-answer cost — the point of the whole thing |
+| ⬜ | Applying AI-proposed story patches (they're generated, not yet reviewable) |
+| ⬜ | Answer history over time |
 | ⬜ | Browser setup screen with an editable review step |
 
 ---
@@ -191,13 +192,17 @@ during a spike, the tradeoff is the opposite of what you'd assume:
 
 | | subscription (`claude -p`) | raw API |
 |---|---|---|
-| Cost per answer | ~$0.17 *(rate limits, not dollars)* | ~10x cheaper |
-| Tokens per call | ~40K — only ~3–5K of it ours | just our payload |
+| Cost per analysis | ~$0.24 *(rate limits, not dollars)* | ~$0.04 |
+| Tokens per call | ~48K, of which ~3.2K is ours | just our payload |
 
 The gap is Claude Code's own scaffolding, which can't be stripped from outside
-the CLI. So the subscription's advantage isn't that it's cheaper — it's that it
-spends rate limits instead of money. Both are supported; pick per run with
-`LLM_BACKEND`.
+the CLI and is billed per turn. So the subscription's advantage isn't that it's
+cheaper — it's that it spends rate limits instead of money.
+
+Two things follow. Trimming our prompt is nearly pointless: our content is ~3% of
+the call. And the ratio is ~4x rather than the 10x a trivial probe suggests,
+because output tokens dominate once the response is real and both backends pay
+those. Pick per run with `LLM_BACKEND`.
 
 ---
 

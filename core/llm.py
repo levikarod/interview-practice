@@ -5,10 +5,16 @@ ClaudeCliClient ("cli", the default) shells out to `claude -p` and bills your
 Claude subscription; AnthropicApiClient ("api") uses ANTHROPIC_API_KEY.
 
 The tradeoff between them is the opposite of the obvious one, measured rather
-than guessed. A CLI call carries ~40K tokens of Claude Code scaffolding that
-cannot be stripped from outside the CLI, of which only ~3-5K is our payload, so
-the API backend is roughly 10x cheaper per call. The subscription's advantage is
-that it spends rate limits instead of money, not that it costs less.
+than guessed. A CLI call carries tens of thousands of tokens of Claude Code
+scaffolding that cannot be stripped from outside the CLI. On a real analysis
+call, measured: ~20K cache-write plus ~28K cache-read of scaffolding against
+~3.2K of our own content, billed per turn and typically two turns, for about
+$0.24. The same content through the raw API is about $0.04 at list price - call
+it 4x, not the 10x a trivial probe suggests, because output tokens dominate once
+the response is real.
+
+So the subscription's advantage is that it spends rate limits instead of money,
+not that it costs less.
 
 Five properties of the subprocess call were established by spike and each has a
 way of failing quietly if changed. They are also recorded in CLAUDE.md:
@@ -27,12 +33,19 @@ way of failing quietly if changed. They are also recorded in CLAUDE.md:
 
 Tools are denied rather than merely unused: this is text in, text out, with no
 file or network access.
+
+The CLI version is checked at startup because two installs of Claude Code can
+coexist - a stale npm one on the nvm path and the current native one - and
+whichever PATH finds first wins. An old binary does not fail informatively: it
+reports `unknown option '--json-schema'` and the pipeline dies mid-run. Set
+CLAUDE_BIN to pin a specific executable.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -45,6 +58,57 @@ SANDBOX = REPO_ROOT / "runtime" / "sandbox"
 DEFAULT_MODEL = "claude-opus-5"
 TIMEOUT_SECONDS = 300
 NO_TOOLS = ""
+
+MIN_VERSION = (2, 1, 205)
+PERMISSION_PROMPTS_VERSION = (2, 1, 259)
+
+NATIVE_INSTALL_DIRS = [
+    Path.home() / ".local" / "bin",
+    Path.home() / ".claude" / "local",
+]
+
+_version_cache: dict[str, tuple[int, ...]] = {}
+
+
+def cli_version(exe: str) -> tuple[int, ...]:
+    """The version of a claude executable, cached per path."""
+    if exe not in _version_cache:
+        try:
+            out = subprocess.run([exe, "--version"], capture_output=True,
+                                 text=True, timeout=30).stdout
+            found = re.search(r"(\d+)\.(\d+)\.(\d+)", out)
+            _version_cache[exe] = tuple(int(g) for g in found.groups()) if found else ()
+        except (OSError, subprocess.SubprocessError):
+            _version_cache[exe] = ()
+    return _version_cache[exe]
+
+
+def find_claude() -> str | None:
+    """The newest `claude` on PATH, not merely the first.
+
+    Two installs commonly coexist - a stale npm one under nvm and the current
+    native one - and PATH order decides which `shutil.which` returns. Picking the
+    first found is how a 2.0.x binary ends up serving a request and failing with
+    `unknown option '--json-schema'`. Whichever is newest is the one the user
+    meant, so choose it rather than making them reorder PATH.
+    """
+    if override := os.environ.get("CLAUDE_BIN"):
+        return override
+
+    places = [Path(e) for e in os.environ.get("PATH", "").split(os.pathsep) if e]
+    places += NATIVE_INSTALL_DIRS
+
+    seen: dict[str, tuple[int, ...]] = {}
+    for directory in places:
+        for name in ("claude.exe", "claude.cmd", "claude"):
+            candidate = directory / name
+            if candidate.is_file():
+                resolved = str(candidate)
+                seen.setdefault(resolved, cli_version(resolved))
+
+    if not seen:
+        return shutil.which("claude")
+    return max(seen, key=lambda path: seen[path])
 
 
 class LLMError(RuntimeError):
@@ -77,13 +141,27 @@ class ClaudeCliClient:
 
     def __init__(self, model: str = DEFAULT_MODEL) -> None:
         self.model = model
-        exe = shutil.which("claude")
+        exe = find_claude()
         if not exe:
             raise LLMError(
                 "`claude` is not on PATH. Install the Claude Code CLI and log in, "
                 "or set LLM_BACKEND=api with an ANTHROPIC_API_KEY."
             )
+
+        version = cli_version(exe)
+        if version and version < MIN_VERSION:
+            raise LLMError(
+                f"{exe} is Claude Code "
+                f"{'.'.join(map(str, version))}, but --json-schema needs "
+                f"{'.'.join(map(str, MIN_VERSION))} or newer. "
+                "You probably have two installs and PATH is finding the older "
+                "one first - an npm install under nvm often shadows the native "
+                "one. Check `where claude`, then either fix PATH or set "
+                "CLAUDE_BIN to the newer executable."
+            )
+
         self.exe = exe
+        self.version = version
         SANDBOX.mkdir(parents=True, exist_ok=True)
 
     def complete(
@@ -95,9 +173,10 @@ class ClaudeCliClient:
             self.exe, "-p", instruction,
             "--output-format", "json",
             "--allowedTools", NO_TOOLS,
-            "--permission-prompts", "none",
             "--model", self.model,
         ]
+        if self.version >= PERMISSION_PROMPTS_VERSION:
+            cmd += ["--permission-prompts", "none"]
         if schema is not None:
             cmd += ["--json-schema", json.dumps(schema)]
         if system:

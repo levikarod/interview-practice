@@ -63,6 +63,7 @@
       <ol class="stages">
         <li data-stage="transcribing">Transcribing locally</li>
         <li data-stage="measuring">Measuring delivery</li>
+        <li data-stage="analysing">Checking against your stories</li>
         <li data-stage="done">Done</li>
       </ol>
     </div>
@@ -70,7 +71,36 @@
     <div id="result" hidden>
       <h3 id="result-question"></h3>
       <div class="stats" id="stats"></div>
-      <p class="transcript" id="transcript"></p>
+
+      <div id="feedback">
+        <section class="fb" id="fb-missed" hidden>
+          <h4>What you had and didn't say</h4>
+          <ul id="missed"></ul>
+        </section>
+
+        <section class="fb risky" id="fb-risky" hidden>
+          <h4>Wouldn't survive a follow-up</h4>
+          <ul id="risky"></ul>
+        </section>
+
+        <section class="fb" id="fb-fixes" hidden>
+          <h4>Next time</h4>
+          <ol id="fixes"></ol>
+        </section>
+
+        <section class="fb" id="fb-strengths" hidden>
+          <h4>Worked</h4>
+          <ul id="strengths"></ul>
+        </section>
+
+        <p class="star" id="star"></p>
+      </div>
+
+      <details class="raw">
+        <summary>What you said</summary>
+        <p class="transcript" id="transcript"></p>
+      </details>
+
       <button id="again" class="primary">Next question</button>
     </div>
 
