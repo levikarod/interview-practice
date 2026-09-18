@@ -83,7 +83,12 @@ def needs_ingest(directory: Path | None = None) -> bool:
 
 def parse_story(text: str) -> Story:
     """Parse one `stories/<id>.md` file."""
-    match = _FRONTMATTER.match(text.lstrip("﻿"))
+    # Normalise line endings and strip a BOM before anything else, so a file
+    # saved by a Windows editor parses to the same Story as one saved by vim.
+    # .gitattributes keeps checkouts on LF; this handles everything else.
+    text = text.lstrip("﻿").replace("\r\n", "\n")
+
+    match = _FRONTMATTER.match(text)
     if not match:
         raise ValueError("story file has no YAML frontmatter block")
 

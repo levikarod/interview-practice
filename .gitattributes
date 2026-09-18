@@ -1,0 +1,16 @@
+# Check every text file out with LF, on every platform.
+#
+# Not cosmetic. Story files are asserted to round-trip byte-identically, so that
+# an AI-proposed patch lands as a minimal diff instead of rewriting the file. On
+# Windows, core.autocrlf=true hands the working tree CRLF while dump_story emits
+# LF, which fails that assertion on a fresh clone - the whole suite goes red for
+# anyone who clones the repo on Windows.
+* text=auto eol=lf
+
+# Binary: never touch these.
+*.png  binary
+*.jpg  binary
+*.pdf  binary
+*.webm binary
+*.wav  binary
+*.mp3  binary
