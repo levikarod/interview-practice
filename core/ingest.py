@@ -12,6 +12,10 @@ correcting Markdown is pleasant where correcting JSON is not.
 The Markdown parser below is deterministic - no model, no cost. A CV that already
 carries `<!--meta -->` blocks (because we generated it, or because you write yours
 that way) skips the model entirely.
+
+Bullets are collected under any `### ` heading whose section is not in _NON_ROLE,
+so "Selected Projects" contributes just like "Experience" does - which matters
+when the best material lives in a side project.
 """
 
 from __future__ import annotations
@@ -23,14 +27,9 @@ import yaml
 
 from core.schemas import CvBullet, CvRole, Profile, Story, StoryStatus
 
-# A bullet's metadata block, emitted by the extractor and editable by hand.
 _META = re.compile(r"<!--meta\s*\r?\n(.*?)-->", re.S)
-# Trailing "(...)" groups on a role heading: location and/or dates.
 _PARENS = re.compile(r"\(([^()]*)\)\s*$")
 
-# Sections whose bullets are not achievements. Everything else that sits under a
-# "### " heading counts - so "Selected Projects" contributes bullets just like
-# "Experience" does, which matters when the best material lives in a side project.
 _NON_ROLE = {"skills", "certifications", "education", "languages", "summary"}
 
 
@@ -78,12 +77,18 @@ def _split_role_heading(heading: str) -> tuple[str, str, str]:
 
 
 def parse_cv_markdown(text: str) -> Profile:
-    """Parse a CV in our Markdown format into a Profile. Deterministic."""
+    """Parse a CV in our Markdown format into a Profile. Deterministic.
+
+    A `<!--meta -->` block attaches to the bullet immediately above it. Ordinary
+    HTML comments are notes for humans and are skipped wholesale. A non-bullet
+    line following a bullet is treated as a continuation of it, since PDF
+    extraction wraps long bullets.
+    """
     profile = Profile()
     lines = text.splitlines()
 
     role: CvRole | None = None
-    section = ""          # current "## " section, lowercased
+    section = ""
     pending_bullet: CvBullet | None = None
     summary: list[str] = []
     i = 0
@@ -98,7 +103,6 @@ def parse_cv_markdown(text: str) -> Profile:
         line = lines[i]
         stripped = line.strip()
 
-        # A meta block attaches to the bullet immediately above it.
         if stripped.startswith("<!--meta"):
             block = _META.search("\n".join(lines[i:]))
             if block and pending_bullet:
@@ -114,13 +118,11 @@ def parse_cv_markdown(text: str) -> Profile:
                 if metric and str(metric).lower() != "none":
                     pending_bullet.metric = str(metric)
                 pending_bullet.metric_sourced = bool(meta.get("metric_sourced", False))
-            # Skip past the block.
             while i < len(lines) and "-->" not in lines[i]:
                 i += 1
             i += 1
             continue
 
-        # Ordinary HTML comments are notes for humans; ignore them wholesale.
         if stripped.startswith("<!--"):
             while i < len(lines) and "-->" not in lines[i]:
                 i += 1
@@ -148,7 +150,6 @@ def parse_cv_markdown(text: str) -> Profile:
             pending_bullet = CvBullet(id=_slug(f"{role.org}-{body[:40]}", "bullet"),
                                       text=body)
         elif stripped.startswith("- ") and section == "skills":
-            # "- **Backend:** Python, Go, REST APIs"
             body = re.sub(r"^\*\*(.+?):\*\*", "", stripped[2:]).strip()
             profile.skills.extend(
                 s.strip() for s in body.split(",") if s.strip() and len(s.strip()) < 40
@@ -156,7 +157,6 @@ def parse_cv_markdown(text: str) -> Profile:
         elif section == "summary" and stripped and not stripped.startswith("#"):
             summary.append(stripped)
         elif pending_bullet and stripped and not stripped.startswith(("-", "#", "*")):
-            # Continuation of a wrapped bullet.
             pending_bullet.text += " " + stripped
 
         i += 1
@@ -164,7 +164,6 @@ def parse_cv_markdown(text: str) -> Profile:
     close_bullet()
     profile.summary = " ".join(summary).strip()
 
-    # Headline: the first bold line before any section heading.
     for line in lines[:12]:
         s = line.strip()
         if s.startswith("**") and s.endswith("**") and len(s) > 4:
@@ -324,7 +323,7 @@ def derive(directory: Path | None = None, create_stubs: bool = True) -> dict:
     must not throw that away. New bullets get new stubs; everything else is left
     exactly as it is.
     """
-    from core import profile_store  # local import: avoids a circular import
+    from core import profile_store
 
     directory = directory or profile_store.profile_dir()
     markdown = (directory / "cv.md").read_text(encoding="utf-8")
@@ -358,14 +357,15 @@ def _main() -> None:
         uv run python -m core.ingest                 re-derive the active profile
         uv run python -m core.ingest ~/cv.pdf        ingest a CV, then derive
         uv run python -m core.ingest profile.example re-derive a specific folder
+
+    stdout is wrapped in UTF-8 because Windows consoles default to cp1252 and
+    raise on an em-dash. The data is fine; the terminal is not.
     """
     import io
     import sys
 
     from core import profile_store
 
-    # Windows consoles default to cp1252 and raise on an em-dash. The data is
-    # fine; the terminal is not.
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8",
                                   errors="replace")
 
@@ -389,7 +389,6 @@ def _main() -> None:
     profile = result["profile"]
 
     if not result["roles"]:
-        # A silent empty profile looks like a bug. Say what actually happened.
         print("\nNo roles were found in cv.md.")
         print("Expected '### Title, Employer (Location) (Dates)' headings under")
         print("'## Experience'. Open cv.md and compare it against")

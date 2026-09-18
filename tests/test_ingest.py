@@ -24,13 +24,17 @@ def profile():
 
 class TestRoleHeading:
     """The trailing comma-part means different things in different CVs, and the
-    parenthetical is what disambiguates. These cases are drawn from two real CVs
-    that disagreed with each other."""
+    parenthetical is what disambiguates. These cases come from two real CVs that
+    disagreed with each other.
+
+    With a location in parens, the last comma-part is the ORG. Without one, the
+    trailing comma-part is the LOCATION and the org is the middle part - the
+    case that used to parse Droppo's org as "Colombia".
+    """
 
     @pytest.mark.parametrize(
         "heading,title,org,dates",
         [
-            # Location in parens -> last comma-part is the ORG.
             ("Senior Backend Engineer, Payments Platform team, Vanta Pay "
              "(Remote) (2022 - Present)",
              "Senior Backend Engineer", "Vanta Pay", "2022 - Present"),
@@ -39,12 +43,8 @@ class TestRoleHeading:
              "Software Engineer", "Qrvey", "March 2025 - August 2026"),
             ("Full Stack Developer, Smartrader (Bogota) (March 2022 - December 2022)",
              "Full Stack Developer", "Smartrader", "March 2022 - December 2022"),
-            # No location parens -> trailing comma-part is the LOCATION, so the
-            # org is the middle part. This is the case that used to yield
-            # org="Colombia".
             ("Software Engineer & Founder, Droppo, Colombia (April 2020 - Present)",
              "Software Engineer & Founder", "Droppo", "April 2020 - Present"),
-            # Bare project heading.
             ("Mobiliarisimo.com", "Mobiliarisimo.com", "", ""),
         ],
     )

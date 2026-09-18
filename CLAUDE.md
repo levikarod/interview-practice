@@ -69,7 +69,19 @@ so retrieval focuses the prompt rather than enabling it. When a match is
 uncertain the fix is **send more stories**, not retrieve more cleverly. This is a
 deliberate decision documented in the README; don't quietly reverse it.
 
-### 6. Force UTF-8 on console output
+### 6. Module docstrings yes, inline comments no
+
+`.claude/rules/general.md` says zero comments. This repo amends that one step:
+each file keeps a module docstring explaining what it is for and why it works the
+way it does, because the repo is meant to be read. Line-level `#` and `//`
+commentary does not survive.
+
+When you delete a comment that carried a real finding — a measured number, a
+failure mode, a trap — move it into the module docstring or into this file.
+Don't just delete it. Function docstrings and Pydantic `Field(description=...)`
+are both fine; the latter is not even a comment, it reaches the model.
+
+### 7. Force UTF-8 on console output
 
 Windows consoles default to cp1252 and will raise `UnicodeEncodeError` on an
 em-dash. Any CLI entry point wraps stdout in UTF-8. The data is fine; the

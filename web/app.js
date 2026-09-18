@@ -31,7 +31,6 @@ async function load() {
   const stories = await fetch("/api/stories").then((r) => r.json());
   const { verified, draft, stub, total } = profile.stories;
 
-  // The progression stub -> draft -> verified is the product; show it as one line.
   $("#story-progress").textContent =
     `${total} stories — ${verified} verified, ${draft} draft, ${stub} stub. ` +
     `Answering questions fills the empty ones in.`;

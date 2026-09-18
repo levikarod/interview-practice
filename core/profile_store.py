@@ -7,6 +7,10 @@ a fresh clone runs immediately instead of showing an empty screen.
 Story files round-trip exactly: parse -> dump produces byte-identical output for
 an unchanged story, so an AI-proposed patch shows up as a minimal git diff rather
 than a reformatting of the whole file.
+
+SECTIONS fixes both the body headings and the order they are written in;
+META_KEYS does the same for frontmatter keys. Both orders are load-bearing:
+a stable serialisation is what keeps those diffs small.
 """
 
 from __future__ import annotations
@@ -23,7 +27,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 REAL_DIR = REPO_ROOT / "profile"
 EXAMPLE_DIR = REPO_ROOT / "profile.example"
 
-# Body headings <-> Story fields. Order here is the order written to disk.
 SECTIONS: list[tuple[str, str]] = [
     ("Claim", "claim"),
     ("Situation", "situation"),
@@ -33,7 +36,6 @@ SECTIONS: list[tuple[str, str]] = [
     ("Reflection", "reflection"),
 ]
 
-# Frontmatter key order, so diffs stay stable.
 META_KEYS = ["id", "title", "status", "source", "role", "tags", "aliases",
              "metric", "verified"]
 
@@ -77,15 +79,18 @@ def needs_ingest(directory: Path | None = None) -> bool:
     return (directory / "cv.md").exists() and not (directory / "cv.json").exists()
 
 
-# --------------------------------------------------------------------------- #
-# Stories
-# --------------------------------------------------------------------------- #
 
 def parse_story(text: str) -> Story:
-    """Parse one `stories/<id>.md` file."""
-    # Normalise line endings and strip a BOM before anything else, so a file
-    # saved by a Windows editor parses to the same Story as one saved by vim.
-    # .gitattributes keeps checkouts on LF; this handles everything else.
+    """Parse one `stories/<id>.md` file.
+
+    Line endings are normalised and a BOM stripped first, so a story saved by a
+    Windows editor parses to the same Story as one saved by vim. .gitattributes
+    keeps checkouts on LF; this covers everything else.
+
+    Any `## ` heading closes the section in progress, and an unrecognised one
+    then collects nothing - otherwise a note added under your own heading would
+    be silently absorbed into Reflection.
+    """
     text = text.lstrip("﻿").replace("\r\n", "\n")
 
     match = _FRONTMATTER.match(text)
@@ -102,9 +107,6 @@ def parse_story(text: str) -> Story:
 
     for line in body.splitlines():
         if line.startswith("## "):
-            # Any heading closes the section in progress. An unrecognised one
-            # then collects nothing - otherwise a note you added under your own
-            # heading would be silently absorbed into Reflection.
             if current:
                 sections[current] = "\n".join(buf).strip()
             current = heading_to_field.get(line[3:].strip().lower())
@@ -118,13 +120,16 @@ def parse_story(text: str) -> Story:
 
 
 def dump_story(story: Story) -> str:
-    """Serialise a Story back to Markdown. Inverse of `parse_story`."""
+    """Serialise a Story back to Markdown. Inverse of `parse_story`.
+
+    Empty values are omitted, except tags and aliases which stay as empty lists
+    so the frontmatter shape is predictable.
+    """
     meta: dict[str, object] = {}
     for key in META_KEYS:
         value = getattr(story, key)
         if isinstance(value, StoryStatus):
             value = value.value
-        # Keep empty lists/None out of the file unless structurally expected.
         if value in (None, [], "") and key not in ("tags", "aliases"):
             continue
         meta[key] = value
@@ -142,7 +147,11 @@ def stories_dir(directory: Path | None = None) -> Path:
 
 
 def load_stories(directory: Path | None = None) -> list[Story]:
-    """Every story in the active profile, sorted by id for stable ordering."""
+    """Every story in the active profile, sorted by id for stable ordering.
+
+    A malformed story is skipped with a warning rather than raised: one bad file
+    must not cost you the whole practice session.
+    """
     folder = stories_dir(directory)
     if not folder.exists():
         return []
@@ -151,7 +160,6 @@ def load_stories(directory: Path | None = None) -> list[Story]:
         try:
             out.append(parse_story(path.read_text(encoding="utf-8")))
         except (ValueError, TypeError) as exc:
-            # One malformed story must not take down the whole practice session.
             print(f"[profile] skipping {path.name}: {exc}")
     return out
 
@@ -164,9 +172,6 @@ def save_story(story: Story, directory: Path | None = None) -> Path:
     return path
 
 
-# --------------------------------------------------------------------------- #
-# CV and guardrails
-# --------------------------------------------------------------------------- #
 
 def load_profile(directory: Path | None = None) -> Profile:
     """Load the derived `cv.json`. Returns an empty Profile if not yet derived."""

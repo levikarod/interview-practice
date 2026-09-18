@@ -23,9 +23,6 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-# --------------------------------------------------------------------------- #
-# Stories
-# --------------------------------------------------------------------------- #
 
 class StoryStatus(str, Enum):
     """A story's lifecycle. The whole product is moving stories rightwards.
@@ -41,10 +38,20 @@ class StoryStatus(str, Enum):
 
 
 class Story(Strict):
+    """One interview story.
+
+    The claim comes from a CV bullet. The STAR+R fields below it are empty on a
+    stub and fill in as you answer questions about it.
+    """
+
     id: str
     title: str
     status: StoryStatus = StoryStatus.STUB
-    source: str = "cv"                      # cv | transcript:<id> | import
+    source: str = Field(
+        default="cv",
+        description="Where this came from: 'cv', 'transcript:<session-id>', "
+                    "or 'import'.",
+    )
     role: str | None = None
     tags: list[str] = Field(default_factory=list)
     aliases: list[str] = Field(
@@ -53,9 +60,11 @@ class Story(Strict):
                     "This is what makes tag retrieval survive vocabulary drift.",
     )
     metric: str | None = None
-    verified: str | None = None             # ISO date, set by a human
+    verified: str | None = Field(
+        default=None,
+        description="ISO date on which a human confirmed the wording and facts.",
+    )
 
-    # STAR+R. Empty strings on a stub; filled in as you practise.
     claim: str = ""
     situation: str = ""
     task: str = ""
@@ -69,9 +78,6 @@ class Story(Strict):
                         self.result, self.reflection])
 
 
-# --------------------------------------------------------------------------- #
-# CV
-# --------------------------------------------------------------------------- #
 
 class CvBullet(Strict):
     id: str
@@ -122,9 +128,6 @@ class Profile(Strict):
         return [t for t in seen if t]
 
 
-# --------------------------------------------------------------------------- #
-# Feedback - the one model call's output
-# --------------------------------------------------------------------------- #
 
 class MissedPoint(Strict):
     point: str = Field(description="Something in the candidate's own stories "
@@ -179,9 +182,6 @@ class Feedback(Strict):
     story_patch: StoryPatch | None = None
 
 
-# --------------------------------------------------------------------------- #
-# Generated questions
-# --------------------------------------------------------------------------- #
 
 class Question(Strict):
     id: str

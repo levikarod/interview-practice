@@ -1,20 +1,32 @@
 """The one place this app talks to a model.
 
-Two backends behind one interface:
+Two backends behind one interface, chosen by the LLM_BACKEND env var:
+ClaudeCliClient ("cli", the default) shells out to `claude -p` and bills your
+Claude subscription; AnthropicApiClient ("api") uses ANTHROPIC_API_KEY.
 
-    ClaudeCliClient    shells out to `claude -p`, billed to your subscription
-    AnthropicApiClient uses ANTHROPIC_API_KEY, billed per token
+The tradeoff between them is the opposite of the obvious one, measured rather
+than guessed. A CLI call carries ~40K tokens of Claude Code scaffolding that
+cannot be stripped from outside the CLI, of which only ~3-5K is our payload, so
+the API backend is roughly 10x cheaper per call. The subscription's advantage is
+that it spends rate limits instead of money, not that it costs less.
 
-Pick with the LLM_BACKEND env var ("cli" by default, or "api").
+Five properties of the subprocess call were established by spike and each has a
+way of failing quietly if changed. They are also recorded in CLAUDE.md:
 
-The tradeoff is the opposite of what you'd assume, measured rather than guessed:
-a CLI call carries ~40K tokens of Claude Code scaffolding we can't strip, of
-which only ~3-5K is our payload. The API backend sends just our payload and is
-roughly 10x cheaper per call. The subscription's advantage is that it spends
-rate limits instead of money, not that it costs less.
+1. No --bare. Bare mode ignores the subscription login entirely and exits with
+   "Not logged in", because it never reads OAuth credentials or the keychain.
+2. cwd is runtime/sandbox, which is empty. A non-bare `claude -p` run loads
+   CLAUDE.md, hooks and MCP servers from its working directory, so running from
+   the repo root would inject this project's own instructions into every call.
+3. The payload goes on stdin, never argv. Argv caps at 32767 characters on
+   Windows and ~256KB on macOS, and a transcript plus stories exceeds that.
+4. Failures arrive as is_error=true alongside subtype="success". Checking the
+   exit code or the subtype alone will each mislead you.
+5. Real input token counts live in the cache fields. usage.input_tokens alone
+   reads about 2 no matter how large the prompt was.
 
-Every detail of the subprocess call below was established by spike. See the
-"LLM subprocess contract" section of CLAUDE.md before changing any of it.
+Tools are denied rather than merely unused: this is text in, text out, with no
+file or network access.
 """
 
 from __future__ import annotations
@@ -28,15 +40,10 @@ from pathlib import Path
 from typing import Any, Protocol
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-# Deliberately empty. A non-bare `claude -p` run loads CLAUDE.md, hooks and MCP
-# servers from its working directory; running from the repo root would inject
-# this project's own instructions into every call.
 SANDBOX = REPO_ROOT / "runtime" / "sandbox"
 
 DEFAULT_MODEL = "claude-opus-5"
 TIMEOUT_SECONDS = 300
-
-# Denied rather than merely unused: we want text in, text out, no file access.
 NO_TOOLS = ""
 
 
@@ -46,10 +53,11 @@ class LLMError(RuntimeError):
 
 @dataclass
 class Completion:
-    """A model response plus what it cost."""
+    """A model response plus what it cost. `data` is populated only when a
+    schema was supplied."""
 
     text: str = ""
-    data: dict[str, Any] | None = None      # populated when a schema was given
+    data: dict[str, Any] | None = None
     cost_usd: float = 0.0
     tokens_in: int = 0
     tokens_out: int = 0
@@ -64,12 +72,8 @@ class LLMClient(Protocol):
     ) -> Completion: ...
 
 
-# --------------------------------------------------------------------------- #
-# Subscription backend
-# --------------------------------------------------------------------------- #
-
 class ClaudeCliClient:
-    """Runs `claude -p` as a subprocess. Uses your Claude Code login."""
+    """Runs `claude -p` as a subprocess, using your Claude Code login."""
 
     def __init__(self, model: str = DEFAULT_MODEL) -> None:
         self.model = model
@@ -90,8 +94,6 @@ class ClaudeCliClient:
         cmd = [
             self.exe, "-p", instruction,
             "--output-format", "json",
-            # NOT --bare: bare mode ignores the subscription login entirely and
-            # fails with "Not logged in".
             "--allowedTools", NO_TOOLS,
             "--permission-prompts", "none",
             "--model", self.model,
@@ -103,9 +105,7 @@ class ClaudeCliClient:
 
         try:
             proc = subprocess.run(
-                cmd,
-                input=payload,          # stdin, never argv: argv caps at 32767
-                cwd=SANDBOX,            # chars on Windows and ~256KB on macOS
+                cmd, input=payload, cwd=SANDBOX,
                 capture_output=True, text=True, encoding="utf-8",
                 timeout=TIMEOUT_SECONDS,
             )
@@ -120,8 +120,6 @@ class ClaudeCliClient:
         except json.JSONDecodeError as exc:
             raise LLMError(f"claude returned non-JSON: {proc.stdout[:400]}") from exc
 
-        # Failures arrive as is_error=true with subtype="success" and a non-zero
-        # exit. Checking exit code or subtype alone will both mislead you.
         if envelope.get("is_error"):
             raise LLMError(f"claude failed: {str(envelope.get('result'))[:400]}")
 
@@ -130,7 +128,6 @@ class ClaudeCliClient:
             text=envelope.get("result") or "",
             data=envelope.get("structured_output"),
             cost_usd=float(envelope.get("total_cost_usd") or 0.0),
-            # Real input lands in the cache fields; `input_tokens` alone reads ~2.
             tokens_in=(usage.get("input_tokens", 0)
                        + usage.get("cache_read_input_tokens", 0)
                        + usage.get("cache_creation_input_tokens", 0)),
@@ -139,12 +136,8 @@ class ClaudeCliClient:
         )
 
 
-# --------------------------------------------------------------------------- #
-# API backend
-# --------------------------------------------------------------------------- #
-
 class AnthropicApiClient:
-    """Uses the Anthropic API directly. Needs ANTHROPIC_API_KEY."""
+    """Calls the Anthropic API directly. Needs ANTHROPIC_API_KEY."""
 
     def __init__(self, model: str = DEFAULT_MODEL) -> None:
         try:
@@ -186,10 +179,6 @@ class AnthropicApiClient:
             model=self.model,
         )
 
-
-# --------------------------------------------------------------------------- #
-# Test double
-# --------------------------------------------------------------------------- #
 
 @dataclass
 class FakeLLMClient:
