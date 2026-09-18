@@ -15,8 +15,9 @@ stories, and your guardrails all live on disk as Markdown you can edit.
 
 ## Status
 
-Being built in phases. **The record → transcribe → feedback loop is not wired up
-yet.** What runs today:
+Being built in phases. You can record an answer and get it transcribed; **the
+feedback step is not wired up yet**, so you get your own words and delivery
+stats back, not yet an analysis. What runs today:
 
 | | |
 |---|---|
@@ -24,10 +25,10 @@ yet.** What runs today:
 | ✅ | Story bank: parse, render, `stub → draft → verified` lifecycle |
 | ✅ | Guardrails: flags CV figures with nothing behind them |
 | ✅ | Sample profile so the app runs with zero setup |
-| ⬜ | Browser setup screen with an editable review step |
-| ⬜ | Record, timer, local transcription |
-| ⬜ | Retrieval + feedback |
+| ✅ | Record against a hard-stop timer, transcribe locally, measure delivery |
+| ⬜ | Retrieval + feedback — the point of the whole thing |
 | ⬜ | AI-proposed story patches |
+| ⬜ | Browser setup screen with an editable review step |
 
 ---
 
@@ -93,6 +94,35 @@ because it's already in the target format.
 > material doesn't have to be.
 
 ---
+
+## Transcription
+
+Runs locally with faster-whisper and costs nothing. No system ffmpeg needed — it
+decodes through PyAV, which ships its own.
+
+The CV doubles as the speech model's glossary: tech terms from `cv.json` are
+passed as an `initial_prompt`, with distinctive names first (an internal capital
+or a digit — ClickHouse, RabbitMQ, k6), because the prompt budget is small and
+"Python" needs no help. Measured on one clip, that turned "two **salary**
+workers" into "two **Celery** workers".
+
+Model size, measured on a 25s clip at CPU int8:
+
+| | named entities | speed | a 120s answer |
+|---|---|---|---|
+| `small.en` (default) | 4/6 | 0.44x realtime | ~53s |
+| `medium.en` | 4/6 | 1.73x realtime | ~3.5 min |
+
+Same entities, but `medium.en` was clearly better on the surrounding sentence —
+"the **lock alone** was not enough" where `small.en` heard "the **local owner**
+was". That phrase is what the analysis step reads, so it matters. It still isn't
+the default, because 3.5 minutes per answer breaks the practice loop. Set
+`WHISPER_MODEL=medium.en` to trade pace for accuracy.
+
+Those numbers come from synthesised speech, which is harder for Whisper than a
+real voice — treat them as a floor.
+
+First run downloads the weights (~0.5GB), which the UI warns about.
 
 ## How it works
 

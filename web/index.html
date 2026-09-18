@@ -16,17 +16,67 @@
 <div id="sample-banner" class="banner" hidden>
   <strong>Sample data.</strong>
   You're practising against a fictional engineer's CV.
-  <a href="/setup">Add your own CV</a> to make the feedback about you.
+  Run <code>uv run python -m core.ingest your-cv.pdf</code> to use your own.
 </div>
 
 <div id="ingest-banner" class="banner" hidden>
   <strong>Setup unfinished.</strong>
   Found your <code>cv.md</code>, but nothing has been derived from it yet —
   so there are no stories to check your answers against.
-  <a href="/setup">Finish setup</a> to build the story bank.
+  Run <code>uv run python -m core.ingest</code> to build the story bank.
+</div>
+
+<div id="model-banner" class="banner" hidden>
+  <strong>First run downloads the speech model</strong>
+  (<span id="model-name"></span>, ~0.5&nbsp;GB). It happens once, on your first
+  answer, and takes a couple of minutes. Nothing is broken.
 </div>
 
 <main>
+
+  <section class="card" id="practice">
+    <h2>Practice</h2>
+
+    <div id="idle">
+      <p class="muted">Ready when you are.</p>
+      <button id="start" class="primary">Start a question</button>
+    </div>
+
+    <div id="asked" hidden>
+      <p class="question" id="question-text"></p>
+      <p class="muted small" id="question-meta"></p>
+
+      <div class="controls">
+        <button id="record" class="primary">Record answer</button>
+        <button id="stop" class="danger" hidden>Stop</button>
+        <button id="skip" class="ghost">Different question</button>
+        <span id="timer" class="timer" hidden>0:00</span>
+      </div>
+      <div class="meter" id="meter" hidden><div class="meter-fill" id="meter-fill"></div></div>
+      <p class="muted small" id="record-hint" hidden>
+        Recording stops automatically when the timer runs out.
+      </p>
+    </div>
+
+    <div id="working" hidden>
+      <p class="stage" id="stage-label">Working…</p>
+      <ol class="stages">
+        <li data-stage="transcribing">Transcribing locally</li>
+        <li data-stage="measuring">Measuring delivery</li>
+        <li data-stage="done">Done</li>
+      </ol>
+    </div>
+
+    <div id="result" hidden>
+      <h3 id="result-question"></h3>
+      <div class="stats" id="stats"></div>
+      <p class="transcript" id="transcript"></p>
+      <button id="again" class="primary">Next question</button>
+    </div>
+
+    <p id="practice-error" class="error" hidden></p>
+  </section>
+
   <section class="card">
     <h2>Profile</h2>
     <dl id="profile-summary"><dd class="muted">Loading…</dd></dl>
@@ -37,6 +87,7 @@
     <p class="muted" id="story-progress"></p>
     <ul id="story-list"></ul>
   </section>
+
 </main>
 
 <script src="/static/app.js"></script>

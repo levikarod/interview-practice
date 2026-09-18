@@ -7,17 +7,22 @@ Run: uv run uvicorn main:app --reload
 
 from __future__ import annotations
 
+import asyncio
+import json
+import uuid
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sse_starlette.sse import EventSourceResponse
 
-from core import profile_store
+from core import profile_store, questions, runs, transcribe
 from core.profile_store import ProfileNotSetUp
 
 REPO_ROOT = Path(__file__).resolve().parent
 WEB_DIR = REPO_ROOT / "web"
+AUDIO_DIR = REPO_ROOT / "runtime" / "audio"
 
 app = FastAPI(title="Interview Practice", version="0.1.0")
 
@@ -46,6 +51,8 @@ def get_profile() -> dict:
         "roles": len(profile.roles),
         "bullets": sum(len(r.bullets) for r in profile.roles),
         "has_guardrails": bool(profile_store.load_guardrails(directory).strip()),
+        "model_cached": transcribe.is_model_cached(),
+        "whisper_model": transcribe.DEFAULT_MODEL,
         "stories": {
             "total": len(stories),
             "stub": sum(1 for s in stories if s.status.value == "stub"),
@@ -70,6 +77,59 @@ def list_stories() -> list[dict]:
         }
         for s in profile_store.load_stories()
     ]
+
+
+@app.get("/api/questions")
+def list_questions() -> list[dict]:
+    return [q.model_dump() for q in questions.load_questions()]
+
+
+@app.get("/api/questions/next")
+def next_question(exclude: str = "") -> dict:
+    """A question to ask, avoiding ids listed in `exclude` (comma separated)."""
+    asked = {qid for qid in exclude.split(",") if qid}
+    question = questions.pick_question(exclude=asked)
+    if question is None:
+        raise HTTPException(404, "No questions available.")
+    return question.model_dump()
+
+
+@app.post("/api/answer")
+async def submit_answer(audio: UploadFile, question_id: str = Form(...)) -> dict:
+    """Accept a recorded answer and start processing it.
+
+    Returns immediately with a run id; the browser follows progress on
+    /api/runs/{id}/events. Transcription is far too slow to block a request on.
+    """
+    if questions.get_question(question_id) is None:
+        raise HTTPException(400, f"Unknown question {question_id!r}")
+
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    suffix = Path(audio.filename or "answer.webm").suffix or ".webm"
+    path = AUDIO_DIR / f"{question_id}-{uuid.uuid4().hex[:8]}{suffix}"
+    path.write_bytes(await audio.read())
+
+    run = runs.create_run(question_id, path)
+    asyncio.create_task(runs.process(run))
+    return {"run_id": run.id}
+
+
+@app.get("/api/runs/{run_id}")
+def get_run(run_id: str) -> dict:
+    run = runs.get_run(run_id)
+    if run is None:
+        raise HTTPException(404, "Unknown run")
+    return run.snapshot()
+
+
+@app.get("/api/runs/{run_id}/events")
+async def run_events(run_id: str) -> EventSourceResponse:
+    """Stage changes for one run, as server-sent events."""
+    async def stream():
+        async for event in runs.events(run_id):
+            yield {"data": json.dumps(event)}
+
+    return EventSourceResponse(stream())
 
 
 @app.get("/")

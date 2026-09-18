@@ -114,18 +114,37 @@ class Profile(Strict):
     def tech_terms(self) -> list[str]:
         """Vocabulary hint for faster-whisper's `initial_prompt`.
 
-        The CV doubles as the ASR glossary, which costs nothing and fixes exactly
-        the words that matter most in a technical answer.
+        The CV doubles as the ASR glossary, which costs nothing and fixes the
+        words a technical answer turns on.
+
+        Distinctive terms come first, because the prompt has a small budget and
+        spending it on words the model already knows is wasted. A term counts as
+        distinctive when it has an internal capital or a digit - ClickHouse,
+        RabbitMQ, MercadoLibre, k6 - which is exactly the shape of name a general
+        speech model mangles. "Python" and "REST APIs" need no help.
         """
-        terms: list[str] = list(self.skills)
+        import re
+
+        raw: list[str] = list(self.skills)
         for role in self.roles:
-            terms.extend(role.tech)
+            raw.extend(role.tech)
             for b in role.bullets:
-                terms.extend(b.skills)
+                raw.extend(b.skills)
+
         seen: dict[str, None] = {}
-        for t in terms:
-            seen.setdefault(t.strip(), None)
-        return [t for t in seen if t]
+        for term in raw:
+            for atom in re.split(r"[(),/]", term):
+                atom = atom.strip()
+                if atom and len(atom) < 32:
+                    seen.setdefault(atom, None)
+
+        def distinctive(term: str) -> bool:
+            body = term[1:]
+            return any(c.isupper() for c in body) or any(c.isdigit() for c in body)
+
+        unique = list(seen)
+        return ([t for t in unique if distinctive(t)]
+                + [t for t in unique if not distinctive(t)])
 
 
 
@@ -181,6 +200,37 @@ class Feedback(Strict):
     )
     story_patch: StoryPatch | None = None
 
+
+
+class Word(Strict):
+    """One word with its timing, used to find pauses."""
+
+    text: str
+    start: float
+    end: float
+
+
+class Transcript(Strict):
+    text: str = ""
+    words: list[Word] = Field(default_factory=list)
+    duration_s: float = 0.0
+    language: str = ""
+
+
+class AnswerMetrics(Strict):
+    """Delivery measurements, computed in code rather than asked of a model.
+
+    Pace and hesitation are arithmetic over word timings. Spending a model call
+    on them would be slower, costlier and less reliable than counting.
+    """
+
+    duration_s: float = 0.0
+    word_count: int = 0
+    words_per_minute: int = 0
+    filler_count: int = 0
+    fillers: dict[str, int] = Field(default_factory=dict)
+    longest_pause_s: float = 0.0
+    overran: bool = False
 
 
 class Question(Strict):

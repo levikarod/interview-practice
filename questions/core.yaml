@@ -1,0 +1,159 @@
+# Questions that work for any backend-leaning engineer, so a fresh clone has
+# something real to practise before any CV is ingested.
+#
+# `tags` are the retrieval keys. They are matched against each story's `tags` and
+# `aliases`, which is why story aliases are worth generating carefully - a
+# question says "idempotency" and a story has to answer to that word.
+#
+# `seconds` is the answer budget and the recording hard-stops there. 90 is right
+# for a mechanism question, 150 for one that needs a full STAR arc.
+
+- id: idempotency
+  text: How did you implement idempotency?
+  kind: technical
+  seconds: 120
+  tags: [idempotency, retries, deduplication, correctness, distributed-systems]
+
+- id: hardest-bug
+  text: Tell me about the hardest bug you've debugged. How did you find it?
+  kind: behavioural
+  seconds: 150
+  tags: [incident, debugging, root-cause, postmortem, failure]
+
+- id: production-incident
+  text: Walk me through a production incident you owned end to end.
+  kind: behavioural
+  seconds: 150
+  tags: [incident, on-call, outage, postmortem, reliability, customer-impact]
+
+- id: scaling-bottleneck
+  text: Describe a time you found and fixed a performance bottleneck.
+  kind: technical
+  seconds: 120
+  tags: [performance, scaling, latency, profiling, optimization, database]
+
+- id: data-migration
+  text: Tell me about a data or storage migration you led. What could have gone wrong?
+  kind: technical
+  seconds: 150
+  tags: [migration, data, storage, database, replatforming, risk]
+
+- id: queue-backpressure
+  text: How do you handle a queue that's filling faster than it drains?
+  kind: technical
+  seconds: 120
+  tags: [queues, backpressure, load-shedding, throughput, overload, scaling]
+
+- id: build-vs-buy
+  text: Talk me through a build-versus-buy call you made and how it turned out.
+  kind: behavioural
+  seconds: 120
+  tags: [tradeoffs, judgment, vendor, third-party, architecture, decision]
+
+- id: disagreement
+  text: Tell me about a technical decision you disagreed with. What did you do?
+  kind: behavioural
+  seconds: 150
+  tags: [conflict, influence, communication, teamwork, judgment]
+
+- id: testing-strategy
+  text: How do you decide what to test and what not to?
+  kind: technical
+  seconds: 120
+  tags: [testing, quality, coverage, tdd, regression, tradeoffs]
+
+- id: api-design
+  text: Walk me through an API you designed. What would you change now?
+  kind: technical
+  seconds: 150
+  tags: [api-design, rest, interfaces, contracts, versioning, reflection]
+
+- id: multi-tenancy
+  text: How did you keep one customer's data from reaching another's?
+  kind: technical
+  seconds: 120
+  tags: [multi-tenancy, security, authorization, isolation, access-control]
+
+- id: observability
+  text: Something breaks silently in production. How do you find out?
+  kind: technical
+  seconds: 120
+  tags: [observability, monitoring, alerting, logging, tracing, reliability]
+
+- id: shipped-wrong
+  text: Tell me about something you shipped that turned out to be wrong.
+  kind: behavioural
+  seconds: 150
+  tags: [failure, mistake, reflection, judgment, ownership]
+
+- id: unrequested-work
+  text: Describe something you built that nobody asked you to build.
+  kind: behavioural
+  seconds: 120
+  tags: [initiative, ownership, tooling, developer-experience, leverage]
+
+- id: legacy-code
+  text: How do you approach a codebase you don't understand yet?
+  kind: behavioural
+  seconds: 120
+  tags: [legacy, onboarding, refactoring, codebase, learning]
+
+- id: concurrency-bug
+  text: Tell me about a race condition or concurrency bug you fixed.
+  kind: technical
+  seconds: 120
+  tags: [concurrency, race-conditions, locking, distributed-systems, correctness]
+
+- id: schema-change
+  text: How do you ship a breaking schema change without breaking anyone?
+  kind: technical
+  seconds: 120
+  tags: [schema, migrations, backwards-compatibility, data, deployment]
+
+- id: cost-control
+  text: Tell me about a time you reduced what something cost to run.
+  kind: technical
+  seconds: 120
+  tags: [cost, efficiency, finops, optimization, infrastructure]
+
+- id: llm-in-production
+  text: What's different about running an LLM feature in production versus a demo?
+  kind: technical
+  seconds: 150
+  tags: [llm, ai, evaluation, prompt-engineering, non-determinism, production-ml]
+
+- id: mentoring
+  text: Tell me about a time you brought someone else up to speed.
+  kind: behavioural
+  seconds: 120
+  tags: [mentoring, teamwork, communication, leadership, documentation]
+
+- id: scope-cut
+  text: Describe a time you cut scope. How did you decide what to drop?
+  kind: behavioural
+  seconds: 120
+  tags: [prioritization, scope, tradeoffs, delivery, judgment, product]
+
+- id: why-this-tech
+  text: Pick a technology you chose. Why that one, and what did you give up?
+  kind: technical
+  seconds: 120
+  tags: [tradeoffs, architecture, decision, technology-choice, judgment]
+
+- id: deploy-safely
+  text: How do you deploy something risky without taking the system down?
+  kind: technical
+  seconds: 120
+  tags: [deployment, release, rollback, feature-flags, risk, ci-cd]
+
+- id: third-party-failure
+  text: A service you depend on goes down. What did you build for that?
+  kind: technical
+  seconds: 120
+  tags: [resilience, fault-tolerance, third-party, retries, degradation, failure]
+
+- id: proudest
+  text: What's the piece of work you're proudest of, and why that one?
+  kind: behavioural
+  seconds: 150
+  tags: [ownership, impact, reflection, motivation]

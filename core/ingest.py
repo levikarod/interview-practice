@@ -33,6 +33,28 @@ _PARENS = re.compile(r"\(([^()]*)\)\s*$")
 _NON_ROLE = {"skills", "certifications", "education", "languages", "summary"}
 
 
+def _split_outside_parens(text: str) -> list[str]:
+    """Split on commas that are not inside parentheses.
+
+    "Python (Flask, Celery), TypeScript" is three tools, not four fragments.
+    Splitting naively produced terms like "Python (Flask" and "SQLAlchemy)",
+    which polluted both the skills list and the speech-recognition vocabulary.
+    """
+    parts, buf, depth = [], [], 0
+    for ch in text:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        if ch == "," and depth == 0:
+            parts.append("".join(buf).strip())
+            buf = []
+        else:
+            buf.append(ch)
+    parts.append("".join(buf).strip())
+    return [p for p in parts if p]
+
+
 def _slug(text: str, fallback: str = "item") -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return slug[:60] or fallback
@@ -152,7 +174,7 @@ def parse_cv_markdown(text: str) -> Profile:
         elif stripped.startswith("- ") and section == "skills":
             body = re.sub(r"^\*\*(.+?):\*\*", "", stripped[2:]).strip()
             profile.skills.extend(
-                s.strip() for s in body.split(",") if s.strip() and len(s.strip()) < 40
+                s for s in _split_outside_parens(body) if s and len(s) < 40
             )
         elif section == "summary" and stripped and not stripped.startswith("#"):
             summary.append(stripped)
