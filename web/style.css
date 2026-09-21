@@ -198,3 +198,73 @@ code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: .
 .raw { margin: 18px 0; }
 .raw summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
 .raw .transcript { margin-top: 10px; }
+
+textarea, input[type="search"], input[type="text"], input[type="number"], select {
+  font: inherit;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--fg);
+}
+textarea { resize: vertical; }
+input[type="search"] { max-width: 280px; }
+label.toggle { display: flex; align-items: center; gap: 6px; color: var(--muted);
+               font-size: .9rem; }
+label.toggle input { width: auto; }
+
+.qlist, .drafts { list-style: none; margin: 14px 0 0; padding: 0; }
+
+.qrow, .draft { border-top: 1px solid var(--line); padding: 12px 0; }
+.qrow:first-child, .draft:first-child { border-top: 0; }
+.qrow { display: flex; gap: 14px; align-items: flex-start; }
+.qrow.off { opacity: .45; }
+.qmain { flex: 1; min-width: 0; }
+.qactions { display: flex; gap: 6px; flex-shrink: 0; }
+.qactions button { padding: 4px 10px; font-size: .85rem; }
+
+.qtext { margin: 0 0 6px; }
+.qmeta { margin: 0; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.qnote { margin: 7px 0 0; color: var(--muted); font-size: .88rem; }
+
+.tag {
+  font-size: .72rem;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.badge.custom { color: var(--accent); border-color: var(--accent); }
+.badge.jd { color: var(--warn); border-color: var(--warn); }
+
+.target { font-size: .76rem; color: var(--accent); }
+.role-summary {
+  margin: 18px 0 0;
+  padding: 10px 13px;
+  border-left: 3px solid var(--accent);
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.draft label { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
+.draft label input { width: auto; margin-top: 4px; flex-shrink: 0; }
+.draft .qmeta, .draft .qnote { margin-left: 25px; }
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--card);
+  color: var(--fg);
+  padding: 22px;
+  max-width: 560px;
+  width: calc(100% - 32px);
+}
+dialog::backdrop { background: rgba(0, 0, 0, .45); }
+dialog label { display: block; margin-bottom: 13px; font-size: .9rem;
+               color: var(--muted); }
+dialog label textarea, dialog label input, dialog label select {
+  margin-top: 5px; color: var(--fg); }
+dialog .row { display: flex; gap: 13px; }
+dialog .row label { flex: 1; }

@@ -236,11 +236,31 @@ class AnswerMetrics(Strict):
 class Question(Strict):
     id: str
     text: str
-    tags: list[str] = Field(default_factory=list)
-    seconds: int = 120
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Retrieval keys. Matched against story tags and aliases, so "
+                    "they should use the words a story would answer to.",
+    )
+    seconds: int = Field(default=120, ge=30, le=600)
     kind: Literal["technical", "behavioural", "system-design"] = "technical"
-    targets_story_id: str | None = None
+    targets_story_id: str | None = Field(
+        default=None,
+        description="A story this question is meant to pull out, when it was "
+                    "written against a specific one.",
+    )
+    enabled: bool = True
+    source: Literal["core", "custom", "jd"] = "core"
+    note: str = Field(
+        default="",
+        description="Why this question is worth asking this candidate. Shown "
+                    "when reviewing generated questions, not during practice.",
+    )
 
 
-class QuestionSet(Strict):
-    questions: list[Question] = Field(default_factory=list, max_length=20)
+class GeneratedQuestions(Strict):
+    """Questions drafted from a job description, for review before they are kept."""
+
+    role_summary: str = Field(
+        description="One line: what this role actually screens for.",
+    )
+    questions: list[Question] = Field(default_factory=list, max_length=12)

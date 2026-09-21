@@ -27,6 +27,7 @@ say. What runs today:
 | ✅ | Sample profile so the app runs with zero setup |
 | ✅ | Record against a hard-stop timer, transcribe locally, measure delivery |
 | ✅ | Retrieval, feedback, and per-answer cost — the point of the whole thing |
+| ✅ | Question bank: browse, edit, generate from a job description |
 | ⬜ | Applying AI-proposed story patches (they're generated, not yet reviewable) |
 | ⬜ | Answer history over time |
 | ⬜ | Browser setup screen with an editable review step |
@@ -169,6 +170,42 @@ can say *"your CV claims 20+ repositories and you never mentioned the number"* �
 and each answer you give fills in the empty sections.
 
 ---
+
+## Questions
+
+`/questions` browses the bank, edits any question, and drafts new ones from a
+job description.
+
+**Two layers.** `questions/core.yaml` is committed and works for anyone. Yours —
+edited, hand-written, or generated — live in gitignored
+`<profile>/questions.yaml` and win on id collision. So editing a shipped question
+writes an override rather than modifying the committed file: the repo stays
+pristine, and `git pull` never fights your edits. Removing a shipped question
+tombstones it as `enabled: false` for the same reason.
+
+### From a job description
+
+Paste a posting and one model call drafts 8–12 questions. The prompt sees the
+posting *and* a summary of your material, because a question is only worth
+practising when it sits in the overlap — something the role will probe that you
+have something to say about.
+
+Each draft carries:
+
+- **tags** drawn from your own stories' vocabulary, which is what decides whether
+  the right story gets retrieved during practice
+- **`targets_story_id`** when the question aims at a specific story
+- **a note** on why it's worth asking *you* for *this* role
+
+A couple deliberately target **gaps** — something the role needs where your
+material is thin — and say so. Rehearsing the honest "I haven't done that, here's
+the closest thing" is worth more than rehearsing a strength again.
+
+Nothing is saved until you pick. A bank that fills itself with mediocre questions
+is worse than one that stays small.
+
+> Generation costs ~$1.50 on the subscription path, because it sends your whole
+> profile and writes long notes. That's per job application, not per answer.
 
 ## Design decisions
 

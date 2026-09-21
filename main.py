@@ -12,12 +12,13 @@ import json
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
-from core import db, profile_store, questions, runs, transcribe
+from core import db, jd, profile_store, questions, runs, transcribe
+from core.schemas import Question
 from core.profile_store import ProfileNotSetUp
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -80,8 +81,68 @@ def list_stories() -> list[dict]:
 
 
 @app.get("/api/questions")
-def list_questions() -> list[dict]:
-    return [q.model_dump() for q in questions.load_questions()]
+def list_questions(include_disabled: bool = False) -> list[dict]:
+    """The merged bank. `include_disabled` shows questions you've turned off."""
+    core_ids = {q.id for q in questions.load_core()}
+    return [
+        {**q.model_dump(), "is_core": q.id in core_ids}
+        for q in questions.load_questions(include_disabled=include_disabled)
+    ]
+
+
+@app.put("/api/questions/{question_id}")
+def save_question(question_id: str, question: Question) -> dict:
+    """Create or edit a question.
+
+    Edits to a shipped question are written to your own layer rather than to the
+    committed bank, so the repo stays pristine and a pull never fights you.
+    """
+    if question.id != question_id:
+        raise HTTPException(400, "id in the body must match the URL")
+
+    if question.source == "core" and question.enabled:
+        question = question.model_copy(update={"source": "custom"})
+
+    saved = questions.upsert(question)
+    return saved.model_dump()
+
+
+@app.post("/api/questions")
+def add_question(question: Question) -> dict:
+    existing = {q.id for q in questions.load_questions(include_disabled=True)}
+    if not question.id or question.id in existing:
+        question = question.model_copy(
+            update={"id": questions.slug(question.text, existing)})
+    return questions.upsert(question.model_copy(update={"source": "custom"})).model_dump()
+
+
+@app.post("/api/questions/bulk")
+def add_questions(payload: list[Question] = Body(...)) -> dict:
+    """Accept a batch, which is how generated questions are kept."""
+    saved = questions.upsert_many(payload)
+    return {"saved": [q.model_dump() for q in saved]}
+
+
+@app.delete("/api/questions/{question_id}")
+def remove_question(question_id: str) -> dict:
+    if not questions.delete(question_id):
+        raise HTTPException(404, f"Unknown question {question_id!r}")
+    return {"deleted": question_id}
+
+
+@app.post("/api/jd/generate")
+def generate_from_jd(payload: dict = Body(...)) -> dict:
+    """Draft questions from a job description. Nothing is saved."""
+    try:
+        drafted, completion = jd.generate(payload.get("text", ""))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    return {
+        "role_summary": drafted.role_summary,
+        "questions": [q.model_dump() for q in drafted.questions],
+        "cost_usd": round(completion.cost_usd, 4),
+    }
 
 
 @app.get("/api/questions/next")
@@ -144,6 +205,11 @@ def get_history(question_id: str = "", limit: int = 20) -> dict:
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
+
+
+@app.get("/questions")
+def questions_page() -> FileResponse:
+    return FileResponse(WEB_DIR / "questions.html")
 
 
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
