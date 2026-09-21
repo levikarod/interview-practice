@@ -9,7 +9,8 @@ from __future__ import annotations
 import pytest
 
 from core import jd, questions as Q
-from core.schemas import GeneratedQuestions, Question
+from core.schemas import (MAX_NOTE_CHARS, MAX_QUESTION_CHARS,
+                          GeneratedQuestions, Question)
 
 
 @pytest.fixture
@@ -160,3 +161,77 @@ class TestBulkAdd:
         Q.upsert(Question(id="existing", text="Existing", source="custom"), bank)
         Q.upsert_many([Question(id="new", text="New", source="jd")], bank)
         assert {q.id for q in Q.load_user(bank)} == {"existing", "new"}
+
+class TestQuestionStyle:
+    """Questions must stay short and open.
+
+    The failure this guards against is a generated question that states the
+    answer - "Forty million records a day in a gigabyte of state, where's the
+    bottleneck?" hands over the numbers the candidate is practising to recall,
+    so rehearsing against it teaches nothing.
+    """
+
+    def test_the_cap_is_in_the_schema_not_the_prompt(self):
+        schema = Question.model_json_schema()["properties"]
+        assert schema["text"]["maxLength"] == MAX_QUESTION_CHARS
+        assert schema["note"]["maxLength"] == MAX_NOTE_CHARS
+
+    def test_every_shipped_question_fits(self):
+        """The core bank is the style reference handed to the model. If one
+        drifts long, the example it calibrates against drifts with it."""
+        too_long = [q.id for q in Q.load_core() if len(q.text) > MAX_QUESTION_CHARS]
+        assert too_long == []
+
+    def test_shipped_questions_are_actually_short(self):
+        """Not merely under the cap - the cap has headroom on purpose."""
+        assert max(len(q.text) for q in Q.load_core()) < 90
+
+    def test_an_over_long_question_is_rejected(self):
+        with pytest.raises(Exception):
+            Question(id="x", text="y" * (MAX_QUESTION_CHARS + 1))
+
+    def test_the_prompt_shows_the_model_what_to_do_instead(self):
+        """Telling a model to be brief works far less well than showing it a
+        rewrite, so the prompt carries before/after pairs."""
+        prompt = jd.PROMPT.read_text(encoding="utf-8").lower()
+        assert "never put the answer in the question" in prompt
+        assert "what to ask instead" in prompt
+
+
+class TestStaleEntriesDoNotBreakTheBank:
+    """A tightened constraint must not take the whole page down.
+
+    The 120-character cap arrived after questions had already been saved
+    without it. Raising on read would mean one stale row hides every other
+    question the user has.
+    """
+
+    @staticmethod
+    def _bank_with_a_stale_row(directory):
+        Q.save_user([Question(id="fine", text="Short enough?")], directory)
+        path = Q.user_bank_path(directory)
+        stale = "- id: stale\n  text: '" + "y" * 200 + "'\n"
+        path.write_text(path.read_text(encoding="utf-8") + stale,
+                        encoding="utf-8")
+        return path
+
+    def test_an_invalid_entry_is_skipped_not_raised(self, bank, capsys):
+        self._bank_with_a_stale_row(bank)
+
+        loaded = Q.load_user(bank)
+
+        assert [q.id for q in loaded] == ["fine"]
+        assert "stale" in capsys.readouterr().out
+
+    def test_the_stale_row_is_skipped_not_deleted(self, bank):
+        """Skipping loses nothing on disk, so the user can still fix it."""
+        path = self._bank_with_a_stale_row(bank)
+
+        Q.load_user(bank)
+
+        assert "stale" in path.read_text(encoding="utf-8")
+
+    def test_the_rest_of_the_bank_still_loads(self, bank):
+        """The whole point: one bad row must not hide the shipped questions."""
+        self._bank_with_a_stale_row(bank)
+        assert len(Q.load_questions(bank)) >= 20

@@ -30,10 +30,47 @@ Eight to twelve questions. Spread them:
 Do not write a question the candidate has no material for at all, unless it is
 one of the gap questions and you say so in the note.
 
+## Writing the question itself
+
+An interviewer asks a short, open question and then stops talking. Match that.
+
+**Never put the answer in the question.** This is the rule that matters most.
+The number, the tool, the mechanism, the outcome - those are exactly what the
+candidate is practising to recall unprompted. A question that states them has
+already done the work, and rehearsing against it teaches nothing.
+
+The specificity belongs in `tags` and `note`, which the candidate does not see
+while answering. So the question stays open and the system still knows which
+story it is reaching for.
+
+**One question, not two.** If you have written "and" between two questions, keep
+the better one.
+
+Rewrite anything that drifts:
+
+| Too long, too specific | What to ask instead |
+|---|---|
+| Walk me through how your row-level security rewrote a query to substitute per-user values, and show me why that didn't cost you query performance. | How did you keep one customer's data from reaching another's? |
+| Forty million stock records a day in roughly a gigabyte of state - where's the bottleneck, and what would you change first? | Where does that pipeline break if the volume grows tenfold? |
+| You cut multi-day silent job failures down to one or two minutes of auto-recovery - what was failing, and what makes the new design notice? | How do you find out when a background job fails silently? |
+| They care about cost per call - how did you get from an OpenAI bill to a cent per published listing, and what did that let you decide? | How do you know what one operation costs you? |
+
+Each rewrite names the *topic* and nothing else. The candidate supplies the
+system, the number and the reasoning, which is the entire exercise.
+
+For calibration, these are real questions from the shipped bank. Yours should
+look like these, not longer:
+
+- How did you implement idempotency?
+- Tell me about the hardest bug you've debugged. How did you find it?
+- How do you handle a queue that's filling faster than it drains?
+- Describe a time you cut scope. How did you decide what to drop?
+- Something breaks silently in production. How do you find out?
+
 ## Fields
 
-**text** — the question as an interviewer would say it out loud. One sentence.
-No preamble, no "can you tell me about a time when" padding if a shorter form works.
+**text** — short, open, one sentence, under 120 characters. See the section
+above; it is the field that goes wrong most often.
 
 **tags** — the retrieval keys. These are matched against the candidate's story
 tags and aliases, so use the words their stories would answer to, taken from the
@@ -48,9 +85,10 @@ needs a full situation-to-result arc.
 
 **kind** — technical, behavioural, or system-design.
 
-**note** — one short line on why this question is worth asking *this* candidate
-for *this* role. Say plainly when it targets a gap. This is shown while reviewing
-the questions, not during practice.
+**note** — one line, under 180 characters, on why this question is worth asking
+*this* candidate for *this* role. Say plainly when it targets a gap. Shown while
+reviewing, never during practice. This is where specifics belong - the question
+must stay open, so put "his CV claims 82.8% here" in the note, not in the text.
 
 **id** — kebab-case, short, derived from the question.
 

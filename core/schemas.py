@@ -16,6 +16,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+MAX_QUESTION_CHARS = 120
+MAX_NOTE_CHARS = 180
+
+
 class Strict(BaseModel):
     """Base for anything sent to the model. `extra='forbid'` makes Pydantic emit
     `additionalProperties: false`, which structured outputs require."""
@@ -235,7 +239,11 @@ class AnswerMetrics(Strict):
 
 class Question(Strict):
     id: str
-    text: str
+    text: str = Field(
+        max_length=MAX_QUESTION_CHARS,
+        description="One short, open question as an interviewer would say it. "
+                    "Never name the specifics the candidate should be recalling.",
+    )
     tags: list[str] = Field(
         default_factory=list,
         description="Retrieval keys. Matched against story tags and aliases, so "
@@ -251,9 +259,9 @@ class Question(Strict):
     enabled: bool = True
     source: Literal["core", "custom", "jd"] = "core"
     note: str = Field(
-        default="",
-        description="Why this question is worth asking this candidate. Shown "
-                    "when reviewing generated questions, not during practice.",
+        default="", max_length=MAX_NOTE_CHARS,
+        description="One line on why this question is worth asking this "
+                    "candidate. Shown when reviewing, not during practice.",
     )
 
 

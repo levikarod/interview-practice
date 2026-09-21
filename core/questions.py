@@ -20,6 +20,7 @@ import re
 from pathlib import Path
 
 import yaml
+from pydantic import ValidationError
 
 from core import profile_store
 from core.schemas import Question
@@ -28,10 +29,26 @@ CORE_BANK = Path(__file__).resolve().parent.parent / "questions" / "core.yaml"
 
 
 def _read(path: Path) -> list[Question]:
+    """Parse a bank file, skipping entries that no longer validate.
+
+    Constraints tighten over time - the 120-character cap on question text
+    arrived after questions had already been saved without it. Raising here
+    would take down the whole bank, and the questions page with it, over one
+    stale row. Skipping loudly lets the rest load and names what to fix.
+    """
     if not path.exists():
         return []
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or []
-    return [Question(**item) for item in raw]
+
+    out: list[Question] = []
+    for item in raw:
+        try:
+            out.append(Question(**item))
+        except (ValidationError, TypeError) as exc:
+            reason = str(exc).splitlines()[-2].strip() if "\n" in str(exc) else exc
+            print(f"[questions] skipping {item.get('id', '?')!r} in {path.name}: "
+                  f"{reason}")
+    return out
 
 
 def user_bank_path(directory: Path | None = None) -> Path:

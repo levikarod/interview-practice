@@ -190,7 +190,15 @@ posting *and* a summary of your material, because a question is only worth
 practising when it sits in the overlap — something the role will probe that you
 have something to say about.
 
-Each draft carries:
+Questions come out short and open — under 120 characters, one question, and
+**never naming the specifics you're meant to be recalling**. "Where does
+per-tenant isolation live in your query path?" rather than "Walk me through how
+your row-level security rewrote a query to substitute per-user values, and show
+me why that didn't cost you query performance." The second one hands you the
+answer, so rehearsing against it teaches nothing.
+
+The specificity lives in the tags and the note, which you don't see while
+answering. Each draft carries:
 
 - **tags** drawn from your own stories' vocabulary, which is what decides whether
   the right story gets retrieved during practice
