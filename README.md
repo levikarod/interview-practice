@@ -1,44 +1,34 @@
+<div align="center">
+
 # Interview Practice
 
-Practise spoken interview answers against **your own CV and story bank**.
+**Answer interview questions out loud. Get told what you had and didn't say.**
 
-You start a question, answer out loud against a timer, and get back short
-actionable feedback. The distinguishing job of that feedback is not "was that a
-good answer" in the abstract — it's:
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Local first](https://img.shields.io/badge/transcription-local%20%26%20free-informational)](#design-decisions)
 
-> **Here is what you had available and didn't say.**
+</div>
 
-That only works if the tool holds your actual material, so it does: your CV, your
-stories, and your guardrails all live on disk as Markdown you can edit.
+Most interview practice tools grade an answer in the abstract. This one holds
+your CV and your own stories, so it can say the thing only you could be told:
 
----
+> **[vanta-idempotency-keys]** You never said you hash the request body
+> alongside the key. Same key, different body returns 422 instead of silently
+> overwriting — that is what makes it safe rather than merely deduplicated.
+>
+> **"I designed the ledger schema for this as well."**
+> Your guardrails say flatly that you did not. The schema predates you by two
+> years and you partitioned an existing table.
+>
+> **Next time —** Lead with the body hash and the 422, not the header.
 
-## Status
-
-Being built in phases, and the core loop works end to end: record an answer, get
-it transcribed locally, and get back what you had in your own material and didn't
-say. What runs today:
-
-| | |
-|---|---|
-| ✅ | CV (PDF, Markdown or text) → `cv.md` → `cv.json` → story stubs |
-| ✅ | Story bank: parse, render, `stub → draft → verified` lifecycle |
-| ✅ | Guardrails: flags CV figures with nothing behind them |
-| ✅ | Sample profile so the app runs with zero setup |
-| ✅ | Record against a hard-stop timer, transcribe locally, measure delivery |
-| ✅ | Retrieval, feedback, and per-answer cost — the point of the whole thing |
-| ✅ | Question bank: browse, edit, generate from a job description |
-| ⬜ | Applying AI-proposed story patches (they're generated, not yet reviewable) |
-| ⬜ | Answer history over time |
-| ⬜ | Browser setup screen with an editable review step |
+That is real output from the bundled sample profile, so you can reproduce it on
+a fresh clone in about a minute.
 
 ---
 
-## Quickstart
-
-**Prerequisites:** Python 3.11+ and [uv](https://docs.astral.sh/uv/). For the
-feedback step you also need the Claude Code CLI installed and logged in (2.1.205
-or newer), or `ANTHROPIC_API_KEY` set with `LLM_BACKEND=api`.
+## Quick start
 
 ```bash
 git clone https://github.com/levikarod/interview-practice
@@ -47,85 +37,49 @@ uv sync
 uv run uvicorn main:app --reload
 ```
 
-Open <http://localhost:8000>.
+Open <http://localhost:8000>. With no profile set up it runs on
+`profile.example/` — a fictional engineer with a CV, six stories and guardrails
+already in place.
 
-With no profile set up, it runs on `profile.example/` — a fictional engineer with
-a CV, six stories and guardrails already in place. You can click around
-immediately without handing your CV to a stranger's repo.
-
-## Using your own CV
-
-Point it at your CV — PDF, Markdown or plain text:
+Then point it at your own CV — PDF, Markdown or plain text:
 
 ```bash
 uv run python -m core.ingest ~/path/to/cv.pdf
 ```
 
-That writes `profile/cv.md`, derives `profile/cv.json`, creates one **story stub**
-per CV bullet, and lists the figures you'd struggle to defend. Reload the page;
-no restart needed.
+**Requires** Python 3.11+, [uv](https://docs.astral.sh/uv/), and a Chromium
+browser. For feedback you also need the Claude Code CLI installed and logged in
+(2.1.205+), or `ANTHROPIC_API_KEY` with `LLM_BACKEND=api`.
 
-Re-run it any time to re-derive after editing `cv.md`:
+## What it does
 
-```bash
-uv run python -m core.ingest
-```
+- **Asks, times, and hard-stops.** Recording ends when the timer runs out,
+  because that is the real constraint.
+- **Transcribes locally.** faster-whisper on your machine. Free, offline, and
+  your voice never leaves it.
+- **Names what you left out.** Every point traces to one of your own stories
+  or CV bullets by id.
+- **Flags what won't survive a follow-up.** Claims your guardrails block,
+  figures you can't source, anything you overstated.
+- **Measures delivery in code.** Pace, filler words, longest pause — arithmetic,
+  not a model's opinion.
+- **Grows your story bank.** Each answer fills in the stories behind your CV
+  bullets.
+- **Writes questions from a job description.** Where the role's requirements
+  overlap material you actually have.
 
-Two things it won't destroy: re-deriving never overwrites a story you've already
-filled in, and ingesting a new CV refuses to clobber an existing `cv.md` — pass
-`--force` if replacing it is genuinely what you want.
+## What it will not do
 
-### How ingestion works
-
-```
-cv.pdf ─┐
-cv.txt ─┼─ text ─→ [one model call] ─→ cv.md ─→ [parse, no model] ─→ cv.json
-cv.md  ─┘                                ↑                              │
-                                         └── edit this by hand ─────────┘
-```
-
-**`cv.md` is the source of truth; `cv.json` is a derived cache.** The PDF is
-never parsed structurally — no column detection, no heading heuristics. Its text
-goes to the model, whose only job is normalising *any* CV into this one format.
-Layout chaos is what a model is good at and what a regex parser is bad at.
-
-A Markdown CV that already carries `<!--meta-->` blocks skips the model entirely,
-because it's already in the target format.
-
-> **`profile/` is gitignored and must stay that way.** It holds real personal
-> data. The repo ships `profile.example/` so the code can be public and your
-> material doesn't have to be.
+- **Send your CV anywhere you didn't choose.** `profile/` is gitignored;
+  transcription is local; only the feedback step calls a model.
+- **Invent a story you didn't tell it.** A stub carries a claim and nothing
+  else, and the prompt says so explicitly.
+- **Replace a mock interview with a person.** It cannot read a room, push back,
+  or follow a hunch.
+- **Score you.** No rating, no percentage. "Good answer" is not a measurement.
+- **Run as a hosted service.** See [the note on other people](#running-this-for-other-people).
 
 ---
-
-## Transcription
-
-Runs locally with faster-whisper and costs nothing. No system ffmpeg needed — it
-decodes through PyAV, which ships its own.
-
-The CV doubles as the speech model's glossary: tech terms from `cv.json` are
-passed as an `initial_prompt`, with distinctive names first (an internal capital
-or a digit — ClickHouse, RabbitMQ, k6), because the prompt budget is small and
-"Python" needs no help. Measured on one clip, that turned "two **salary**
-workers" into "two **Celery** workers".
-
-Model size, measured on a 25s clip at CPU int8:
-
-| | named entities | speed | a 120s answer |
-|---|---|---|---|
-| `small.en` (default) | 4/6 | 0.44x realtime | ~53s |
-| `medium.en` | 4/6 | 1.73x realtime | ~3.5 min |
-
-Same entities, but `medium.en` was clearly better on the surrounding sentence —
-"the **lock alone** was not enough" where `small.en` heard "the **local owner**
-was". That phrase is what the analysis step reads, so it matters. It still isn't
-the default, because 3.5 minutes per answer breaks the practice loop. Set
-`WHISPER_MODEL=medium.en` to trade pace for accuracy.
-
-Those numbers come from synthesised speech, which is harder for Whisper than a
-real voice — treat them as a floor.
-
-First run downloads the weights (~0.5GB), which the UI warns about.
 
 ## How it works
 
@@ -150,151 +104,211 @@ feedback UI ◀──feedback JSON───────────────�
                                                                   runtime/app.db
 ```
 
-**SQLite holds what happened** (sessions, transcripts, feedback, cost).
-**Markdown holds what you know** (`profile/`). So the profile stays git-diffable
-and hand-editable, and the AI's proposed additions arrive as reviewable diffs
-rather than opaque database rows.
+**SQLite holds what happened. Markdown holds what you know.** Practice runs are
+an append-only log, so they belong in a database. Your CV and stories are
+material you edit and review, so they stay as files you can diff.
 
-### The story bank grows as you practise
+## Your material
 
-A CV bullet becomes a **stub** — it knows what you *claim*, but not the story
-behind it:
+Everything the feedback is judged against lives in `profile/`, which is
+gitignored. The repo ships `profile.example/` so the code can be public and your
+material doesn't have to be.
+
+| File | What it is |
+|---|---|
+| `cv.md` | **Source of truth.** Generated from your PDF, then yours to edit |
+| `cv.json` | Derived cache. Re-derived whenever `cv.md` changes |
+| `stories/*.md` | One story per CV bullet, `stub → draft → verified` |
+| `guardrails.md` | Claims you can't defend and figures that are stale |
+| `questions.yaml` | Your questions, overriding the shipped bank by id |
+
+A story starts as a **stub** — it knows what you *claim*, but not the story
+behind it. That's already enough for feedback to say *"your CV claims 20+
+repositories and you never mentioned the number."* Each answer fills in the
+empty sections.
+
+<details>
+<summary><b>How ingestion works</b> — PDF, Markdown or text → one format</summary>
 
 ```
-status: stub     →  claim only, derived from a CV bullet
-status: draft    →  STAR detail proposed from a transcript, unreviewed
-status: verified →  you confirmed the wording and the facts
+cv.pdf ─┐
+cv.txt ─┼─ text ─→ [one model call] ─→ cv.md ─→ [parse, no model] ─→ cv.json
+cv.md  ─┘                                ↑                              │
+                                         └── edit this by hand ─────────┘
 ```
 
-That progression is the product. A stub is already useful on day one — feedback
-can say *"your CV claims 20+ repositories and you never mentioned the number"* —
-and each answer you give fills in the empty sections.
+The PDF is **never parsed structurally** — no column detection, no heading
+heuristics. Its text goes to the model, whose only job is normalising *any* CV
+into this one format. Layout chaos is what a model is good at and a regex parser
+is bad at.
 
----
+A Markdown CV that already carries `<!--meta-->` blocks skips the model
+entirely. Re-run `core.ingest` any time to re-derive; it never overwrites a
+story you've filled in, and refuses to clobber an existing `cv.md` without
+`--force`.
+
+</details>
 
 ## Questions
 
 `/questions` browses the bank, edits any question, and drafts new ones from a
 job description.
 
-**Two layers.** `questions/core.yaml` is committed and works for anyone. Yours —
-edited, hand-written, or generated — live in gitignored
-`<profile>/questions.yaml` and win on id collision. So editing a shipped question
-writes an override rather than modifying the committed file: the repo stays
-pristine, and `git pull` never fights your edits. Removing a shipped question
-tombstones it as `enabled: false` for the same reason.
+**Two layers.** `questions/core.yaml` is committed and works for anyone. Yours
+live in gitignored `profile/questions.yaml` and win on id collision — so editing
+a shipped question writes an override, and `git pull` never fights your edits.
 
-### From a job description
+Generated questions are short and open, and **never name the specifics you're
+meant to be recalling**:
 
-Paste a posting and one model call drafts 8–12 questions. The prompt sees the
-posting *and* a summary of your material, because a question is only worth
-practising when it sits in the overlap — something the role will probe that you
-have something to say about.
+| ✗ | ✓ |
+|---|---|
+| Walk me through how your row-level security rewrote a query to substitute per-user values, and show me why that didn't cost you query performance. | Where does per-tenant isolation live in your query path? |
 
-Questions come out short and open — under 120 characters, one question, and
-**never naming the specifics you're meant to be recalling**. "Where does
-per-tenant isolation live in your query path?" rather than "Walk me through how
-your row-level security rewrote a query to substitute per-user values, and show
-me why that didn't cost you query performance." The second one hands you the
-answer, so rehearsing against it teaches nothing.
+The second one makes you supply the mechanism. The first hands it to you, so
+rehearsing against it teaches nothing. The specificity moves to the tags and the
+note, which you don't see while answering.
 
-The specificity lives in the tags and the note, which you don't see while
-answering. Each draft carries:
+Nothing is saved until you pick. A bank that fills itself is worse than one that
+stays small.
 
-- **tags** drawn from your own stories' vocabulary, which is what decides whether
-  the right story gets retrieved during practice
-- **`targets_story_id`** when the question aims at a specific story
-- **a note** on why it's worth asking *you* for *this* role
-
-A couple deliberately target **gaps** — something the role needs where your
-material is thin — and say so. Rehearsing the honest "I haven't done that, here's
-the closest thing" is worth more than rehearsing a strength again.
-
-Nothing is saved until you pick. A bank that fills itself with mediocre questions
-is worse than one that stays small.
-
-> Generation costs ~$1.50 on the subscription path, because it sends your whole
-> profile and writes long notes. That's per job application, not per answer.
+---
 
 ## Design decisions
 
-Three choices that are load-bearing, and the reasoning behind them.
+The interesting part of this repo is what it deliberately doesn't do.
 
-**Exactly one model call per answer.** Transcription is local, pace and filler
-metrics are plain code, retrieval is plain code. The model is reserved for the
-one step that genuinely needs judgment.
+| Decision | Why |
+|---|---|
+| **One model call per answer** | Transcription is local, metrics are code, retrieval is code. The model is reserved for the one step needing judgment |
+| **No embeddings, no vector store** | The whole profile fits in a 1M context window. Retrieval focuses the prompt rather than enabling it |
+| **Schema constraints, not prompt pleas** | One Pydantic model generates the JSON Schema *and* validates the reply. Length caps are `max_length`, not requests |
+| **Markdown corpus, not a database** | AI-proposed story additions arrive as reviewable git diffs |
+| **Two LLM backends, one interface** | Subscription by default, API key as an alternative. Measured, not assumed |
 
-**No embeddings, no vector store.** Retrieval is tag and alias overlap. The whole
-profile is ~30–60K tokens against a 1M-token context window, so retrieval focuses
-the prompt rather than enabling it — when a match is uncertain the correct fix is
-*send more stories*, not retrieve more cleverly. Vector search would add an
-embedding model, a store, a chunking strategy, an index to keep in sync, and a
-silent wrong-neighbour failure mode, for no capability gain. Worth revisiting
-past a few hundred stories; not before.
+<details>
+<summary><b>Why no vector search</b> — and when that would change</summary>
 
-**Two LLM backends, one interface.** `ClaudeCliClient` shells out to `claude -p`
-and bills your subscription. `AnthropicApiClient` uses an API key. Measured
-during a spike, the tradeoff is the opposite of what you'd assume:
+Retrieval is tag and alias overlap. The whole profile is ~30–60K tokens against
+a 1M-token context window, so when a match is uncertain the correct fix is *send
+more stories*, not retrieve more cleverly.
+
+Vector search would add an embedding model, a store, a chunking strategy, an
+index to keep in sync, and a silent wrong-neighbour failure mode, for no
+capability gain.
+
+The one real weakness of lexical matching is vocabulary drift — a question
+saying "exactly-once" should still reach a story tagged "idempotency". The
+`aliases:` field handles that, so the corpus format solves it rather than the
+retriever.
+
+**Revisit if** the bank passes a few hundred stories, or transcripts of past
+answers become searchable material in their own right.
+
+</details>
+
+<details>
+<summary><b>What a call actually costs</b> — measured, and the surprise in it</summary>
 
 | | subscription (`claude -p`) | raw API |
 |---|---|---|
-| Cost per analysis | ~$0.24 *(rate limits, not dollars)* | ~$0.04 |
+| One analysis | ~$0.24 *(rate limits, not dollars)* | ~$0.04 |
 | Tokens per call | ~48K, of which ~3.2K is ours | just our payload |
+| Questions from a JD | ~$1.50 (per application, not per answer) | — |
 
-The gap is Claude Code's own scaffolding, which can't be stripped from outside
-the CLI and is billed per turn. So the subscription's advantage isn't that it's
-cheaper — it's that it spends rate limits instead of money.
+The gap is Claude Code's own scaffolding, billed per turn and not strippable
+from outside the CLI.
 
-Two things follow. Trimming our prompt is nearly pointless: our content is ~3% of
-the call. And the ratio is ~4x rather than the 10x a trivial probe suggests,
-because output tokens dominate once the response is real and both backends pay
-those. Pick per run with `LLM_BACKEND`.
+Two things follow. **Trimming our prompt is nearly pointless** — our content is
+~3% of the call; the levers are the backend or the model. And the ratio is ~4x,
+not the 10x a trivial probe suggests, because output tokens dominate once the
+response is real and both backends pay those.
+
+</details>
+
+<details>
+<summary><b>Transcription</b> — why <code>small.en</code>, and the CV as a glossary</summary>
+
+Local, free, and no system ffmpeg needed — faster-whisper decodes through PyAV,
+which ships its own.
+
+The CV doubles as the speech model's glossary. Tech terms from `cv.json` go in
+as an `initial_prompt`, distinctive names first (internal capital or a digit —
+ClickHouse, RabbitMQ, k6), because the budget is small and "Python" needs no
+help. Measured on one clip, that turned "two **salary** workers" into "two
+**Celery** workers".
+
+Model size, on a 25s clip at CPU int8:
+
+| | named entities | speed | a 120s answer |
+|---|---|---|---|
+| `small.en` (default) | 4/6 | 0.44x realtime | ~53s |
+| `medium.en` | 4/6 | 1.73x realtime | ~3.5 min |
+
+Same entities, but `medium.en` reads the surrounding sentence better — "the
+**lock alone** was not enough" where `small.en` heard "the **local owner**
+was". That phrase is what the analysis step reads, so it matters. It still isn't
+the default: 3.5 minutes per answer breaks the practice loop. Set
+`WHISPER_MODEL=medium.en` to trade pace for accuracy.
+
+Those numbers come from synthesised speech, which is harder for Whisper than a
+real voice — treat them as a floor. First run downloads ~0.5GB of weights.
+
+</details>
 
 ---
+
+## Configuration
+
+All optional; every one has a working default.
+
+| Variable | Default | What it changes |
+|---|---|---|
+| `LLM_BACKEND` | `cli` | `cli` uses your Claude subscription, `api` uses `ANTHROPIC_API_KEY` |
+| `CLAUDE_BIN` | auto | Pin a specific `claude` executable |
+| `WHISPER_MODEL` | `small.en` | `medium.en` is more accurate and ~4x slower |
+| `WHISPER_COMPUTE` | `int8` | CTranslate2 compute type |
+
+> **Two installs of Claude Code?** A stale npm one often shadows the current
+> native one on PATH. The app picks the newest it can find and reports the
+> version if it's too old, so this usually resolves itself.
 
 ## Development
 
 ```bash
-uv run pytest                    # 34 tests, no model calls
+uv run pytest                    # 129 tests, none make a model call
 uv run uvicorn main:app --reload
 ```
 
 ```
 core/
-  schemas.py        Pydantic models — one declaration produces the JSON Schema
-                    sent to the model AND validates what comes back
+  schemas.py        Pydantic models — the single source of truth
+  llm.py            ClaudeCliClient | AnthropicApiClient behind one interface
+  transcribe.py     faster-whisper wrapper
   profile_store.py  read/write the Markdown profile (byte-identical round-trip)
   ingest.py         CV → profile → story stubs
+  retrieve.py       tag/alias overlap
+  analyze.py        the one model call
+  jd.py             questions from a job description
+  runs.py           per-run asyncio.Queue, drained by SSE
+  db.py             sqlite
 main.py             routes only; logic lives in core/ so it tests without a server
 profile.example/    fictional, committed — sample data and test fixtures
 profile/            gitignored — your real material
 ```
 
-Tests use `profile.example/` exclusively. Nothing in `profile/` may appear in a
-test, a fixture, or a commit.
+Tests use `profile.example/` exclusively, and `tests/conftest.py` makes building
+a real LLM client inside a test raise. See [CLAUDE.md](CLAUDE.md) for the
+invariants that aren't obvious from the code.
 
-See [CLAUDE.md](CLAUDE.md) for the invariants that aren't obvious from the code —
-particularly the LLM subprocess contract, which was established by measurement
-and has five separate ways to get it subtly wrong.
+## Running this for other people
 
----
-
-## A note on running this for other people
-
-The default backend shells out to `claude -p`, which bills your own Claude
-subscription. Running it locally on your own machine and your own login is just
-you using Claude Code, and so is cloning this and running it against your own
-install.
-
-**Hosting it as a service for other people is a different thing, and Anthropic's
-terms don't allow it** — the Agent SDK docs state that third-party developers may
-not offer claude.ai login or rate limits through their products. If you want to
-run this for anyone but yourself, use `LLM_BACKEND=api` with your own API key.
+Anthropic's terms don't allow third-party products to offer claude.ai login.
+Running this locally on your own machine and your own login is you using Claude
+Code, which is fine — as is someone cloning it and running it against their own
+install. **Hosting it as a service for other people is not.** The API-key
+backend exists so the repo never depends on that.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
-
-The code is MIT. The **sample profile is fictional**: Mara Okonjo does not exist,
-and neither do Vanta Pay or Rota Logistics. Your own material lives in gitignored
-`profile/` and is never part of this repository.
+[MIT](LICENSE).
