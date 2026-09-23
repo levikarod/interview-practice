@@ -36,3 +36,5 @@ desktop.ini
 .env
 .env.*
 !.env.example
+
+docs/superpowers/plans/
