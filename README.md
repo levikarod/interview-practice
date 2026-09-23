@@ -10,8 +10,11 @@
 
 </div>
 
-Most interview practice tools grade an answer in the abstract. This one holds
-your CV and your own stories, so it can tell you the one thing they can't.
+**You already knew the answer. You just didn't say it in the room.**
+
+A practice tool with no access to your material can only grade an answer in the
+abstract. This one reads your CV, your stories, and your own notes on what you
+can't defend — so it can name exactly what you left out.
 
 **The question**
 
@@ -71,20 +74,20 @@ browser. For feedback you also need the Claude Code CLI installed and logged in
 
 ## What it does
 
-- **Asks, times, and hard-stops.** Recording ends when the timer runs out,
-  because that is the real constraint.
-- **Transcribes locally.** faster-whisper on your machine. Free, offline, and
-  your voice never leaves it.
-- **Names what you left out.** Every point traces to one of your own stories
-  or CV bullets by id.
-- **Flags what won't survive a follow-up.** Claims your guardrails block,
+- **Names what you left out.** Every point traces back to one of your own
+  stories or CV bullets, by id.
+- **Catches what won't survive a follow-up.** Claims your guardrails block,
   figures you can't source, anything you overstated.
-- **Measures delivery in code.** Pace, filler words, longest pause — arithmetic,
-  not a model's opinion.
-- **Grows your story bank.** Each answer fills in the stories behind your CV
-  bullets.
-- **Writes questions from a job description.** Where the role's requirements
-  overlap material you actually have.
+- **Your voice never leaves your machine.** faster-whisper transcribes on your
+  own CPU: free, offline, no upload.
+- **Trains you to land it inside the window.** Recording stops when the timer
+  does, because that is the real constraint.
+- **Tells you if you rushed or rambled.** Pace, filler count and longest pause,
+  computed as arithmetic rather than a model's opinion.
+- **Turns a CV bullet into a story you can tell.** Each answer fills in the
+  detail behind a claim you're already making.
+- **Rehearses the questions that role will actually ask.** Paste a job
+  description; it drafts questions where its requirements meet your material.
 
 ## What it will not do
 
