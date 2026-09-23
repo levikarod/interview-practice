@@ -37,11 +37,12 @@ say. What runs today:
 ## Quickstart
 
 **Prerequisites:** Python 3.11+ and [uv](https://docs.astral.sh/uv/). For the
-feedback step (not yet wired up) you'll also want the Claude Code CLI installed
-and logged in, or `ANTHROPIC_API_KEY` set.
+feedback step you also need the Claude Code CLI installed and logged in (2.1.205
+or newer), or `ANTHROPIC_API_KEY` set with `LLM_BACKEND=api`.
 
 ```bash
-git clone <repo> && cd interview-practice
+git clone https://github.com/levikarod/interview-practice
+cd interview-practice
 uv sync
 uv run uvicorn main:app --reload
 ```
@@ -274,4 +275,26 @@ test, a fixture, or a commit.
 
 See [CLAUDE.md](CLAUDE.md) for the invariants that aren't obvious from the code —
 particularly the LLM subprocess contract, which was established by measurement
-and has four separate ways to get it subtly wrong.
+and has five separate ways to get it subtly wrong.
+
+---
+
+## A note on running this for other people
+
+The default backend shells out to `claude -p`, which bills your own Claude
+subscription. Running it locally on your own machine and your own login is just
+you using Claude Code, and so is cloning this and running it against your own
+install.
+
+**Hosting it as a service for other people is a different thing, and Anthropic's
+terms don't allow it** — the Agent SDK docs state that third-party developers may
+not offer claude.ai login or rate limits through their products. If you want to
+run this for anyone but yourself, use `LLM_BACKEND=api` with your own API key.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
+
+The code is MIT. The **sample profile is fictional**: Mara Okonjo does not exist,
+and neither do Vanta Pay or Rota Logistics. Your own material lives in gitignored
+`profile/` and is never part of this repository.

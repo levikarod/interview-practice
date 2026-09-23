@@ -3,6 +3,8 @@ name = "interview-practice"
 version = "0.1.0"
 description = "Practise spoken interview answers against your own CV and story bank."
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
