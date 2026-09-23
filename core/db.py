@@ -12,12 +12,17 @@ read in one screen, and a practice log that loses a row is not a crisis.
 Feedback is stored as JSON rather than shredded across tables. It is read back
 whole, never queried field by field, and keeping it as one blob means the schema
 does not have to change every time the Feedback model gains a field.
+
+Story additions proposed by a run are pending until a row in `patch_decisions`
+records that they were accepted or dismissed. The proposal itself stays inside
+`feedback_json`; the decision is the only new fact.
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +42,11 @@ CREATE TABLE IF NOT EXISTS runs (
     audio_path   TEXT
 );
 CREATE INDEX IF NOT EXISTS runs_by_question ON runs (question_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS patch_decisions (
+    run_id     TEXT PRIMARY KEY,
+    decision   TEXT NOT NULL,
+    decided_at REAL NOT NULL
+);
 """
 
 
@@ -116,6 +126,39 @@ def latest_feedback(question_id: str, path: Path | None = None) -> dict | None:
     """
     rows = history(question_id, 1, path)
     return rows[0]["feedback"] if rows else None
+
+
+def pending_patches(path: Path | None = None) -> list[dict]:
+    """Story additions from past runs that nobody has accepted or dismissed yet,
+    newest first."""
+    with connect(path) as conn:
+        rows = conn.execute(
+            "SELECT r.id, r.question_id, r.created_at, r.feedback_json FROM runs r "
+            "LEFT JOIN patch_decisions d ON d.run_id = r.id "
+            "WHERE d.run_id IS NULL AND r.feedback_json IS NOT NULL "
+            "ORDER BY r.created_at DESC"
+        ).fetchall()
+
+    pending = []
+    for r in rows:
+        patch = json.loads(r["feedback_json"]).get("story_patch")
+        if patch:
+            pending.append({"run_id": r["id"], "question_id": r["question_id"],
+                            "created_at": r["created_at"], "patch": patch})
+    return pending
+
+
+def pending_patch(run_id: str, path: Path | None = None) -> dict | None:
+    return next((p for p in pending_patches(path) if p["run_id"] == run_id), None)
+
+
+def record_decision(run_id: str, decision: str, path: Path | None = None) -> None:
+    with connect(path) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO patch_decisions (run_id, decision, decided_at) "
+            "VALUES (?,?,?)",
+            (run_id, decision, time.time()),
+        )
 
 
 def totals(path: Path | None = None) -> dict:
