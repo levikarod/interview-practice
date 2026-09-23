@@ -61,3 +61,11 @@ def test_unknown_section_is_rejected():
 def test_nothing_to_write_is_rejected():
     with pytest.raises(ValueError, match="nothing"):
         apply_patch(STUB, PATCH, ["result"], "t")
+
+
+def test_a_proposed_story_id_must_be_a_plain_slug():
+    """The id becomes a file name. A model-chosen '../x' would write outside the
+    stories folder."""
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        StoryPatch(story_id="../../main", is_new=True, action="x")

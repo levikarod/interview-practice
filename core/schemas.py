@@ -181,7 +181,8 @@ class StoryPatch(Strict):
     own words from the transcript - the model is extracting, not inventing.
     """
 
-    story_id: str = Field(description="Existing story id to enhance, or a new "
+    story_id: str = Field(pattern="^[a-z0-9][a-z0-9-]*$",
+                          description="Existing story id to enhance, or a new "
                                       "kebab-case id.")
     is_new: bool
     situation: str = ""

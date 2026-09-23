@@ -39,6 +39,7 @@ const TEMPLATE = `
       <button id="add-new">Add your own</button>
       <span class="muted small" id="bank-count"></span>
     </div>
+    <p id="bank-error" class="error" hidden></p>
     <ul class="qlist" id="qlist"></ul>
   </section>
 </section>
@@ -160,9 +161,15 @@ function bind() {
     if (button.dataset.act === "edit") return openEditor(question);
 
     const path = `/api/questions/${encodeURIComponent(id)}`;
-    if (question.enabled) await api(path, { method: "DELETE" });
-    else await api(path, json("PUT", { ...toQuestion(question), enabled: true }));
-    loadBank();
+    show("#bank-error", false);
+    try {
+      if (question.enabled) await api(path, { method: "DELETE" });
+      else await api(path, json("PUT", { ...toQuestion(question), enabled: true }));
+      loadBank();
+    } catch (err) {
+      $("#bank-error").textContent = err.message;
+      show("#bank-error", true);
+    }
   });
 
   $("#edit-form").addEventListener("submit", async (event) => {
@@ -224,7 +231,12 @@ function bind() {
       $("#jd-status").textContent = "Nothing selected.";
       return;
     }
-    await api("/api/questions/bulk", json("POST", chosen));
+    try {
+      await api("/api/questions/bulk", json("POST", chosen));
+    } catch (err) {
+      $("#jd-error").textContent = err.message;
+      return show("#jd-error", true);
+    }
     $("#jd-status").textContent = `Added ${chosen.length} to your bank.`;
     show("#drafted", false);
     $("#jd").value = "";

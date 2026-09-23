@@ -19,7 +19,10 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
-from core import db, ingest, jd, patches, profile_store, questions, runs, transcribe
+from pypdf.errors import PyPdfError
+
+from core import (db, ingest, jd, llm, patches, profile_store, questions, runs,
+                  transcribe)
 from core.schemas import Question, Story, StoryPatch, StoryStatus
 from core.profile_store import ProfileNotSetUp
 
@@ -88,7 +91,7 @@ def get_profile() -> dict:
             "verified": sum(1 for s in stories if s.status.value == "verified"),
         },
         "unsourced_metrics": ingest.unsourced_metrics(profile),
-        "pending_additions": len(db.pending_patches()),
+        "pending_additions": len(db.pending_patches(profile_store.kind())),
     }
 
 
@@ -115,8 +118,10 @@ async def upload_cv(file: UploadFile, replace: bool = Form(False)) -> dict:
                 ingest.ingest_file, source, profile_store.REAL_DIR, None, replace)
         except ingest.CvAlreadyExists as exc:
             raise HTTPException(409, "You already have a CV. Replace it?") from exc
-        except ValueError as exc:
-            raise HTTPException(400, str(exc)) from exc
+        except (ValueError, PyPdfError) as exc:
+            raise HTTPException(400, f"Couldn't read that file: {exc}") from exc
+        except llm.LLMError as exc:
+            raise HTTPException(502, f"Converting the CV failed: {exc}") from exc
     return {"markdown": markdown}
 
 
@@ -223,31 +228,31 @@ def list_additions() -> list[dict]:
     return [
         {**p, "story": stories[p["patch"]["story_id"]].model_dump(mode="json")
          if p["patch"]["story_id"] in stories else None}
-        for p in db.pending_patches()
+        for p in db.pending_patches(profile_store.kind())
     ]
 
 
 @app.post("/api/story-additions/{run_id}/accept")
 def accept_addition(run_id: str, payload: dict = Body(...)) -> dict:
     directory = _writable_dir()
-    pending = db.pending_patch(run_id)
+    pending = db.pending_patch(run_id, "own")
     if pending is None:
         raise HTTPException(404, "No pending story addition for that answer.")
-    patch = StoryPatch.model_validate(pending["patch"])
-    current = _find_story(patch.story_id, profile_store.load_stories(directory))
     try:
+        patch = StoryPatch.model_validate(pending["patch"])
+        current = _find_story(patch.story_id, profile_store.load_stories(directory))
         story = patches.apply_patch(current, patch, payload.get("sections") or [],
                                     f"transcript:{run_id}")
+        profile_store.save_story(story, directory)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
-    profile_store.save_story(story, directory)
     db.record_decision(run_id, "accepted")
     return story.model_dump(mode="json")
 
 
 @app.post("/api/story-additions/{run_id}/dismiss")
 def dismiss_addition(run_id: str) -> dict:
-    if db.pending_patch(run_id) is None:
+    if db.pending_patch(run_id, profile_store.kind()) is None:
         raise HTTPException(404, "No pending story addition for that answer.")
     db.record_decision(run_id, "dismissed")
     return {"dismissed": run_id}
@@ -270,6 +275,7 @@ def save_question(question_id: str, question: Question) -> dict:
     Edits to a shipped question are written to your own layer rather than to the
     committed bank, so the repo stays pristine and a pull never fights you.
     """
+    _writable_dir()
     if question.id != question_id:
         raise HTTPException(400, "id in the body must match the URL")
 
@@ -282,6 +288,7 @@ def save_question(question_id: str, question: Question) -> dict:
 
 @app.post("/api/questions")
 def add_question(question: Question) -> dict:
+    _writable_dir()
     existing = {q.id for q in questions.load_questions(include_disabled=True)}
     if not question.id or question.id in existing:
         question = question.model_copy(
@@ -292,12 +299,14 @@ def add_question(question: Question) -> dict:
 @app.post("/api/questions/bulk")
 def add_questions(payload: list[Question] = Body(...)) -> dict:
     """Accept a batch, which is how generated questions are kept."""
+    _writable_dir()
     saved = questions.upsert_many(payload)
     return {"saved": [q.model_dump() for q in saved]}
 
 
 @app.delete("/api/questions/{question_id}")
 def remove_question(question_id: str) -> dict:
+    _writable_dir()
     if not questions.delete(question_id):
         raise HTTPException(404, f"Unknown question {question_id!r}")
     return {"deleted": question_id}

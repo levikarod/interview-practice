@@ -68,6 +68,15 @@ def is_example(directory: Path | None = None) -> bool:
     return (directory or profile_dir()).resolve() == EXAMPLE_DIR.resolve()
 
 
+def kind() -> str:
+    """'example' on the bundled sample, 'own' otherwise. Runs are tagged with it
+    so practice on the sample never leaks into your own profile."""
+    try:
+        return "example" if is_example() else "own"
+    except ProfileNotSetUp:
+        return "own"
+
+
 def needs_ingest(directory: Path | None = None) -> bool:
     """True when a cv.md exists but nothing has been derived from it yet.
 
@@ -168,6 +177,8 @@ def save_story(story: Story, directory: Path | None = None) -> Path:
     folder = stories_dir(directory)
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{story.id}.md"
+    if path.resolve().parent != folder.resolve():
+        raise ValueError(f"Story id {story.id!r} would be saved outside {folder}.")
     path.write_text(dump_story(story), encoding="utf-8")
     return path
 

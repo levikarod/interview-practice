@@ -90,6 +90,14 @@ class TestPipeline:
         assert seen[0] is None
         assert seen[1]["headline"] == "Tighten it."
 
+    async def test_a_run_records_which_profile_it_was_made_on(self, fake_transcribe,
+                                                               tmp_path):
+        fake_transcribe()
+        run = runs.create_run("idempotency", tmp_path / "a.webm")
+        await runs.process(run)
+        assert run.profile in ("example", "own")
+        assert run.profile == ("example" if runs.profile_store.is_example() else "own")
+
     async def test_done_event_reports_the_done_stage(self, fake_transcribe, tmp_path):
         """The snapshot used to be built before the stage was set, so the 'done'
         event carried stage 'measuring'. Anything trusting the embedded snapshot

@@ -49,13 +49,13 @@ def record_run():
     from core import db
 
     def _record(path, run_id, at=1.0, headline="h", patch=None,
-                question_id="idempotency"):
+                question_id="idempotency", profile="own"):
         feedback = {"headline": headline, "missed_points": [], "risky_claims": [],
                     "story_patch": patch}
         run = SimpleNamespace(
             id=run_id, question_id=question_id, started_at=at, transcript=None,
             metrics=None, feedback=SimpleNamespace(model_dump=lambda: feedback),
-            cost_usd=0.0, audio_path="a.webm",
+            cost_usd=0.0, audio_path="a.webm", profile=profile,
         )
         db.save_run(run, path)
     return _record

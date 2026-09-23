@@ -48,6 +48,7 @@ class Run:
     feedback: Feedback | None = None
     cost_usd: float = 0.0
     error: str | None = None
+    profile: str = "own"
     started_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     queue: asyncio.Queue = field(default_factory=asyncio.Queue)
@@ -110,6 +111,7 @@ async def process(run: Run) -> None:
         question = questions.get_question(run.question_id)
         limit = question.seconds if question else None
 
+        run.profile = profile_store.kind()
         await _set_stage(run, "transcribing")
         profile = profile_store.load_profile()
         transcript = await asyncio.to_thread(
@@ -128,7 +130,8 @@ async def process(run: Run) -> None:
 
         if question is not None:
             await _set_stage(run, "analysing")
-            previous = await asyncio.to_thread(db.latest_feedback, run.question_id)
+            previous = await asyncio.to_thread(db.latest_feedback, run.question_id,
+                                               run.profile)
             feedback, completion = await asyncio.to_thread(
                 analyze_mod.analyse, question, transcript, previous=previous
             )

@@ -16,6 +16,11 @@ does not have to change every time the Feedback model gains a field.
 Story additions proposed by a run are pending until a row in `patch_decisions`
 records that they were accepted or dismissed. The proposal itself stays inside
 `feedback_json`; the decision is the only new fact.
+
+Each run records which profile it was made on ('example' or 'own'), so practice
+on the bundled sample never becomes your previous attempt or proposes additions
+to your own stories. The column is added on connect when an older database
+lacks it, and a NULL there means a run from before it existed, counted as yours.
 """
 
 from __future__ import annotations
@@ -39,7 +44,8 @@ CREATE TABLE IF NOT EXISTS runs (
     metrics_json TEXT,
     feedback_json TEXT,
     cost_usd     REAL DEFAULT 0,
-    audio_path   TEXT
+    audio_path   TEXT,
+    profile      TEXT
 );
 CREATE INDEX IF NOT EXISTS runs_by_question ON runs (question_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS patch_decisions (
@@ -56,6 +62,8 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(target)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    if "profile" not in {row[1] for row in conn.execute("PRAGMA table_info(runs)")}:
+        conn.execute("ALTER TABLE runs ADD COLUMN profile TEXT")
     return conn
 
 
@@ -70,7 +78,7 @@ def save_run(run: Any, path: Path | None = None) -> None:
             conn.execute(
                 "INSERT OR REPLACE INTO runs (id, question_id, created_at, "
                 "duration_s, transcript, metrics_json, feedback_json, cost_usd, "
-                "audio_path) VALUES (?,?,?,?,?,?,?,?,?)",
+                "audio_path, profile) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (
                     run.id,
                     run.question_id,
@@ -81,6 +89,7 @@ def save_run(run: Any, path: Path | None = None) -> None:
                     json.dumps(run.feedback.model_dump()) if run.feedback else None,
                     run.cost_usd,
                     str(run.audio_path),
+                    run.profile,
                 ),
             )
     except sqlite3.Error as exc:
@@ -118,17 +127,24 @@ def history(question_id: str | None = None, limit: int = 20,
     ]
 
 
-def latest_feedback(question_id: str, path: Path | None = None) -> dict | None:
-    """The most recent feedback for one question, read raw.
+def latest_feedback(question_id: str, profile: str,
+                    path: Path | None = None) -> dict | None:
+    """The most recent feedback for one question on one profile, read raw.
 
     Raw rather than validated: runs stored before a schema change must still
     serve as the previous attempt.
     """
-    rows = history(question_id, 1, path)
-    return rows[0]["feedback"] if rows else None
+    with connect(path) as conn:
+        row = conn.execute(
+            "SELECT feedback_json FROM runs WHERE question_id = ? "
+            "AND COALESCE(profile, 'own') = ? AND feedback_json IS NOT NULL "
+            "ORDER BY created_at DESC LIMIT 1",
+            (question_id, profile),
+        ).fetchone()
+    return json.loads(row["feedback_json"]) if row else None
 
 
-def pending_patches(path: Path | None = None) -> list[dict]:
+def pending_patches(profile: str, path: Path | None = None) -> list[dict]:
     """Story additions from past runs that nobody has accepted or dismissed yet,
     newest first."""
     with connect(path) as conn:
@@ -136,7 +152,9 @@ def pending_patches(path: Path | None = None) -> list[dict]:
             "SELECT r.id, r.question_id, r.created_at, r.feedback_json FROM runs r "
             "LEFT JOIN patch_decisions d ON d.run_id = r.id "
             "WHERE d.run_id IS NULL AND r.feedback_json IS NOT NULL "
-            "ORDER BY r.created_at DESC"
+            "AND COALESCE(r.profile, 'own') = ? "
+            "ORDER BY r.created_at DESC",
+            (profile,),
         ).fetchall()
 
     pending = []
@@ -148,8 +166,9 @@ def pending_patches(path: Path | None = None) -> list[dict]:
     return pending
 
 
-def pending_patch(run_id: str, path: Path | None = None) -> dict | None:
-    return next((p for p in pending_patches(path) if p["run_id"] == run_id), None)
+def pending_patch(run_id: str, profile: str, path: Path | None = None) -> dict | None:
+    return next((p for p in pending_patches(profile, path) if p["run_id"] == run_id),
+                None)
 
 
 def record_decision(run_id: str, decision: str, path: Path | None = None) -> None:

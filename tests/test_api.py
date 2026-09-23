@@ -186,3 +186,47 @@ class TestProfile:
         profile = own_profile.get("/api/profile").json()
         assert isinstance(profile["unsourced_metrics"], list)
         assert profile["pending_additions"] == 0
+
+
+class TestReviewFixes:
+    def test_an_addition_with_an_unsafe_story_id_is_refused(self, own_profile, record_run,
+                                                            tmp_path):
+        """Stored before the schema forbade it, a path-like id must still never
+        reach the filesystem."""
+        record_run(db.DB_PATH, "r1", patch=patch_for("../../escaped"))
+        response = own_profile.post("/api/story-additions/r1/accept",
+                                    json={"sections": ["action"]})
+        assert response.status_code == 400
+        assert not list(tmp_path.rglob("escaped.md"))
+
+    def test_question_edits_on_the_sample_profile_are_refused(self, client):
+        """The user question bank lives in the profile folder, so on the sample it
+        would land in profile.example/ and vanish once a real CV is uploaded."""
+        question = client.get("/api/questions").json()[0]
+        question.pop("is_core")
+        assert client.put(f"/api/questions/{question['id']}", json=question).status_code == 409
+        assert client.delete(f"/api/questions/{question['id']}").status_code == 409
+        assert client.post("/api/questions/bulk", json=[question]).status_code == 409
+        assert not (profile_store.EXAMPLE_DIR / "questions.yaml").exists()
+
+    def test_sample_additions_do_not_show_on_your_profile(self, own_profile, record_run):
+        record_run(db.DB_PATH, "sample", patch=patch_for("vanta-idempotency-keys"),
+                   profile="example")
+        assert own_profile.get("/api/story-additions").json() == []
+        assert own_profile.get("/api/profile").json()["pending_additions"] == 0
+
+    def test_a_broken_pdf_is_400(self, client):
+        response = upload(client, "cv.pdf", b"not really a pdf")
+        assert response.status_code == 400
+
+    def test_a_failed_conversion_says_why(self, client, monkeypatch):
+        from core import llm
+
+        class Broken:
+            def complete(self, *a, **k):
+                raise llm.LLMError("Not logged in")
+
+        monkeypatch.setattr(llm, "get_client", lambda *a, **k: Broken())
+        response = upload(client, "cv.txt", b"Ana Ruiz, backend engineer.")
+        assert response.status_code == 502
+        assert "Not logged in" in response.json()["detail"]

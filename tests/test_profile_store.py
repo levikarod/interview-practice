@@ -110,3 +110,10 @@ class TestDeriveIsNonDestructive:
         after = ps.load_stories(tmp_path)[0]
         assert after.situation == "hard-won detail"
         assert after.status is StoryStatus.VERIFIED
+
+
+class TestSaving:
+    def test_a_story_cannot_be_saved_outside_its_folder(self, tmp_path):
+        with pytest.raises(ValueError, match="outside"):
+            ps.save_story(Story(id="../escaped", title="x"), tmp_path)
+        assert not (tmp_path / "escaped.md").exists()

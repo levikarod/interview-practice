@@ -29,13 +29,14 @@ async function route() {
     if (a.dataset.section === name) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
-  view.replaceChildren();
+  const host = document.createElement("div");
+  view.replaceChildren(host);
   current = SECTIONS[name];
   refreshRail();
   try {
-    await current.mount(view, params);
+    await current.mount(host, params);
   } catch (err) {
-    view.innerHTML = `<p class="error">Couldn't load this section: ${esc(err.message)}</p>`;
+    if (host.isConnected) host.innerHTML = `<p class="error">Couldn't load this section: ${esc(err.message)}</p>`;
   }
 }
 
