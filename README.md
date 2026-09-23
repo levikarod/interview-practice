@@ -25,7 +25,11 @@ can't defend — so it can name exactly what you left out.
 > So we had a bunch of customers getting charged twice. I killed the worker that
 > was doing it and we refunded everyone. Then I wrote the postmortem.
 
-**What you had and didn't say**
+**The one thing**
+
+> Open with the scale: 1,400 customers over nine hours.
+
+**Left on the table**
 
 - **You said "a bunch".** It was **1,400 customers over nine hours** — and your
   guardrails mark that figure as solid, to be defended without hedging.
@@ -33,19 +37,17 @@ can't defend — so it can name exactly what you left out.
   never set the idempotency key, so the constraint covered a column that path
   never filled.
 
-**Wouldn't survive a follow-up**
+**Would get challenged**
 
 - *"It was a pretty bad day but we got it sorted."* — "Sorted" is unverifiable,
-  and you have a real answer you didn't give: all 1,400 refunded in two days.
+  and you have a real answer you didn't give.
+  **Say instead:** all 1,400 refunded in two days.
 
-**Next time**
+Then **Try again now** asks the same question, and the next feedback opens with
+what you fixed since last time.
 
-1. Open with the scale: 1,400 customers over nine hours.
-2. Name the real cause: a second write path that never set the key.
-3. Give the outcome: all 1,400 refunded in two days.
-
-Every point traces back to a story you wrote. That is real output from the
-bundled sample profile, reproducible on a fresh clone in about a minute.
+Every point traces back to a story you wrote. The findings are real output from
+the bundled sample profile, reproducible on a fresh clone in about a minute.
 
 ---
 
@@ -62,7 +64,11 @@ Open <http://localhost:8000>. With no profile set up it runs on
 `profile.example/` — a fictional engineer with a CV, six stories and guardrails
 already in place.
 
-Then point it at your own CV — PDF, Markdown or plain text:
+Then open **Profile** and upload your own CV (PDF, Markdown or plain text). You
+check what was read, click **Build story bank**, and you're practising on your
+own material.
+
+The same thing works from the command line if you prefer:
 
 ```bash
 uv run python -m core.ingest ~/path/to/cv.pdf
@@ -172,8 +178,8 @@ story you've filled in, and refuses to clobber an existing `cv.md` without
 
 ## Questions
 
-`/questions` browses the bank, edits any question, and drafts new ones from a
-job description.
+The **Questions** section browses the bank, edits any question, and drafts new
+ones from a job description.
 
 **Two layers.** `questions/core.yaml` is committed and works for anyone. Yours
 live in gitignored `profile/questions.yaml` and win on id collision — so editing
@@ -297,7 +303,7 @@ All optional; every one has a working default.
 ## Development
 
 ```bash
-uv run pytest                    # 129 tests, none make a model call
+uv run pytest                    # 170 tests, none make a model call
 uv run uvicorn main:app --reload
 ```
 
@@ -312,8 +318,15 @@ core/
   analyze.py        the one model call
   jd.py             questions from a job description
   runs.py           per-run asyncio.Queue, drained by SSE
+  patches.py        merge a reviewed story addition into a story
   db.py             sqlite
 main.py             routes only; logic lives in core/ so it tests without a server
+web/
+  index.html        the shell: section rail + view
+  app.js            hash router
+  lib.js            fetch and formatting helpers
+  sections/         one module per section: practice, questions, stories, profile
+  style.css
 profile.example/    fictional, committed — sample data and test fixtures
 profile/            gitignored — your real material
 ```

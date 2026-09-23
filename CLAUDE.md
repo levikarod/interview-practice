@@ -13,7 +13,10 @@ say"** — not generic answer coaching.
 
 ## Architecture in one paragraph
 
-FastAPI serves a vanilla-JS page. The browser records with `MediaRecorder` and
+FastAPI serves a vanilla-JS page. The page is one shell with a hash router; each
+section (Practice, Questions, Stories, Profile) is a native ES module in
+`web/sections/` exporting `mount(root, params)`. A Settings section is planned and
+slots in the same way. The browser records with `MediaRecorder` and
 POSTs audio. The server transcribes locally with faster-whisper, computes pace and
 filler metrics in plain code, retrieves relevant stories by tag overlap, and makes
 **exactly one** Claude call that returns a schema-validated `Feedback` object.
@@ -23,6 +26,11 @@ Progress streams back over SSE.
 **Markdown holds what you know** (`profile/`: cv.md, stories, guardrails), so the
 profile stays git-diffable and the AI's proposed additions arrive as reviewable
 diffs.
+
+Story additions the analysis proposes stay inside the run's stored feedback until
+accepted or dismissed; `patch_decisions` records that decision, and only an
+accept writes a story file. Nothing the UI does may write into
+`profile.example/`: mutating routes return 409 on the sample profile.
 
 ## Invariants
 
