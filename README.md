@@ -11,20 +11,38 @@
 </div>
 
 Most interview practice tools grade an answer in the abstract. This one holds
-your CV and your own stories, so it can say the thing only you could be told:
+your CV and your own stories, so it can tell you the one thing they can't.
 
-> **[vanta-idempotency-keys]** You never said you hash the request body
-> alongside the key. Same key, different body returns 422 instead of silently
-> overwriting — that is what makes it safe rather than merely deduplicated.
->
-> **"I designed the ledger schema for this as well."**
-> Your guardrails say flatly that you did not. The schema predates you by two
-> years and you partitioned an existing table.
->
-> **Next time —** Lead with the body hash and the 422, not the header.
+**The question**
 
-That is real output from the bundled sample profile, so you can reproduce it on
-a fresh clone in about a minute.
+> Walk me through a production incident you owned end to end.
+
+**What you actually said**, transcribed on your own machine:
+
+> So we had a bunch of customers getting charged twice. I killed the worker that
+> was doing it and we refunded everyone. Then I wrote the postmortem.
+
+**What you had and didn't say**
+
+- **You said "a bunch".** It was **1,400 customers over nine hours** — and your
+  guardrails mark that figure as solid, to be defended without hedging.
+- **The real cause never came out.** A batch job built its insert by hand and
+  never set the idempotency key, so the constraint covered a column that path
+  never filled.
+
+**Wouldn't survive a follow-up**
+
+- *"It was a pretty bad day but we got it sorted."* — "Sorted" is unverifiable,
+  and you have a real answer you didn't give: all 1,400 refunded in two days.
+
+**Next time**
+
+1. Open with the scale: 1,400 customers over nine hours.
+2. Name the real cause: a second write path that never set the key.
+3. Give the outcome: all 1,400 refunded in two days.
+
+Every point traces back to a story you wrote. That is real output from the
+bundled sample profile, reproducible on a fresh clone in about a minute.
 
 ---
 
@@ -83,7 +101,7 @@ browser. For feedback you also need the Claude Code CLI installed and logged in
 
 ## How it works
 
-```
+```text
 browser                         FastAPI                         disk
 ───────                         ───────                         ────
 MediaRecorder  ──webm/opus──▶  POST /api/answer
@@ -130,7 +148,7 @@ empty sections.
 <details>
 <summary><b>How ingestion works</b> — PDF, Markdown or text → one format</summary>
 
-```
+```text
 cv.pdf ─┐
 cv.txt ─┼─ text ─→ [one model call] ─→ cv.md ─→ [parse, no model] ─→ cv.json
 cv.md  ─┘                                ↑                              │
@@ -280,7 +298,7 @@ uv run pytest                    # 129 tests, none make a model call
 uv run uvicorn main:app --reload
 ```
 
-```
+```text
 core/
   schemas.py        Pydantic models — the single source of truth
   llm.py            ClaudeCliClient | AnthropicApiClient behind one interface
