@@ -20,7 +20,7 @@ dependencies = [
 api = ["anthropic>=0.40"]        # only needed for LLM_BACKEND=api
 
 [dependency-groups]
-dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "httpx2>=2.13.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

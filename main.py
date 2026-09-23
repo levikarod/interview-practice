@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from datetime import date
 from pathlib import Path
 
 from fastapi import Body, FastAPI, Form, HTTPException, UploadFile
@@ -17,8 +18,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
-from core import db, jd, profile_store, questions, runs, transcribe
-from core.schemas import Question
+from core import db, ingest, jd, patches, profile_store, questions, runs, transcribe
+from core.schemas import Question, Story, StoryPatch, StoryStatus
 from core.profile_store import ProfileNotSetUp
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -26,6 +27,31 @@ WEB_DIR = REPO_ROOT / "web"
 AUDIO_DIR = REPO_ROOT / "runtime" / "audio"
 
 app = FastAPI(title="Interview Practice", version="0.1.0")
+
+SAMPLE_IS_READ_ONLY = ("This is the sample profile. Upload your own CV on the "
+                       "Profile page before changing anything.")
+
+
+def _writable_dir() -> Path:
+    """The active profile, refusing the committed sample."""
+    try:
+        directory = profile_store.profile_dir()
+    except ProfileNotSetUp as exc:
+        raise HTTPException(409, str(exc)) from exc
+    if profile_store.is_example(directory):
+        raise HTTPException(409, SAMPLE_IS_READ_ONLY)
+    return directory
+
+
+def _active_stories() -> list[Story]:
+    try:
+        return profile_store.load_stories()
+    except ProfileNotSetUp:
+        return []
+
+
+def _find_story(story_id: str, stories: list[Story]) -> Story | None:
+    return next((s for s in stories if s.id == story_id), None)
 
 
 @app.get("/api/profile")
@@ -60,6 +86,8 @@ def get_profile() -> dict:
             "draft": sum(1 for s in stories if s.status.value == "draft"),
             "verified": sum(1 for s in stories if s.status.value == "verified"),
         },
+        "unsourced_metrics": ingest.unsourced_metrics(profile),
+        "pending_additions": len(db.pending_patches()),
     }
 
 
@@ -76,8 +104,66 @@ def list_stories() -> list[dict]:
             "tags": s.tags,
             "is_empty": s.is_empty(),
         }
-        for s in profile_store.load_stories()
+        for s in _active_stories()
     ]
+
+
+@app.get("/api/stories/{story_id}")
+def get_story(story_id: str) -> dict:
+    story = _find_story(story_id, _active_stories())
+    if story is None:
+        raise HTTPException(404, f"Unknown story {story_id!r}")
+    return story.model_dump(mode="json")
+
+
+@app.post("/api/stories/{story_id}/verify")
+def verify_story(story_id: str) -> dict:
+    directory = _writable_dir()
+    story = _find_story(story_id, profile_store.load_stories(directory))
+    if story is None:
+        raise HTTPException(404, f"Unknown story {story_id!r}")
+    verified = story.model_copy(update={"status": StoryStatus.VERIFIED,
+                                        "verified": date.today().isoformat()})
+    profile_store.save_story(verified, directory)
+    return verified.model_dump(mode="json")
+
+
+@app.get("/api/story-additions")
+def list_additions() -> list[dict]:
+    """Story additions proposed by past answers and not yet decided on, each with
+    the story as it stands now so the two can be compared."""
+    stories = {s.id: s for s in _active_stories()}
+    return [
+        {**p, "story": stories[p["patch"]["story_id"]].model_dump(mode="json")
+         if p["patch"]["story_id"] in stories else None}
+        for p in db.pending_patches()
+    ]
+
+
+@app.post("/api/story-additions/{run_id}/accept")
+def accept_addition(run_id: str, payload: dict = Body(...)) -> dict:
+    directory = _writable_dir()
+    pending = db.pending_patch(run_id)
+    if pending is None:
+        raise HTTPException(404, "No pending story addition for that answer.")
+    patch = StoryPatch.model_validate(pending["patch"])
+    current = _find_story(patch.story_id, profile_store.load_stories(directory))
+    try:
+        story = patches.apply_patch(current, patch, payload.get("sections") or [],
+                                    f"transcript:{run_id}")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    profile_store.save_story(story, directory)
+    db.record_decision(run_id, "accepted")
+    return story.model_dump(mode="json")
+
+
+@app.post("/api/story-additions/{run_id}/dismiss")
+def dismiss_addition(run_id: str) -> dict:
+    if db.pending_patch(run_id) is None:
+        raise HTTPException(404, "No pending story addition for that answer.")
+    db.record_decision(run_id, "dismissed")
+    return {"dismissed": run_id}
 
 
 @app.get("/api/questions")
@@ -205,11 +291,6 @@ def get_history(question_id: str = "", limit: int = 20) -> dict:
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
-
-
-@app.get("/questions")
-def questions_page() -> FileResponse:
-    return FileResponse(WEB_DIR / "questions.html")
 
 
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
