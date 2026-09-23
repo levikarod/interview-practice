@@ -22,7 +22,8 @@ def fake_analysis(monkeypatch):
     from core.schemas import Feedback, StarCoverage
 
     feedback = Feedback(
-        missed_points=[], risky_claims=[], strengths=["clear"], fixes=["tighten it"],
+        headline="Tighten it.",
+        missed_points=[], risky_claims=[], strengths=["clear"],
         star_coverage=StarCoverage(situation=True, task=False, action=True,
                                    result=True, reflection=False),
     )

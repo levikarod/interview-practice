@@ -31,7 +31,9 @@ Flag anything they said that would not survive a follow-up question:
 - It reaches for a technology label their material does not justify.
 
 Quote what they actually said, then say why in one sentence a non-specialist
-would follow. If the guardrails are empty, flag only overclaiming you can see
+would follow.
+Then give `say_instead`: a version of the same point they could defend under a
+follow-up, in their own voice and no longer than what they said. If the guardrails are empty, flag only overclaiming you can see
 directly in their stories. Do not invent guardrails.
 
 ## The rest
@@ -43,14 +45,23 @@ mechanism question does not need all five; report what was there.
 **strengths** — at most three, specific to this answer. "Good structure" is
 useless. "Named the failure mode before the fix" is not.
 
-**fixes** — imperative, under twenty words each, at most five. What to say
-differently next time, in the order they should say it. Not "be more specific"
-but "lead with the dedup key, not the lock".
+**headline** — the one change that would most improve this answer, as a single
+imperative sentence under twenty words. It is the line they will remember, so
+make it concrete: not "be more specific" but "lead with the dedup key, not the
+lock".
 
 **story_patch** — only if the answer contained real STAR detail that their story
 bank is missing. Fill the sections from what they actually said, **in their own
 words**, lightly tidied. You are extracting, not writing. Leave it null if they
 said nothing new, and never fill a section they did not speak to.
+
+## fixed_since_last
+
+When the payload includes their previous attempt at this question, list what
+that attempt missed or got wrong that this one now gets right, at most three,
+each naming the specific thing. Leave it empty when there is no previous attempt
+or nothing improved. Never pad it: credit only what you can point to in the
+transcript.
 
 ## Tone
 

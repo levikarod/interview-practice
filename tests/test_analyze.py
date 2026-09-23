@@ -15,7 +15,8 @@ QUESTION = questions.get_question("idempotency")
 SAID = Transcript(text="I added an idempotency key header.", duration_s=30.0)
 
 VALID = Feedback(
-    missed_points=[], risky_claims=[], strengths=["s"], fixes=["f"],
+    headline="Lead with the dedup key.",
+    missed_points=[], risky_claims=[], strengths=["s"],
     star_coverage=StarCoverage(situation=True, task=True, action=True,
                                result=True, reflection=True),
 ).model_dump()
@@ -103,11 +104,22 @@ class TestCall:
 
 class TestSchemaConstraints:
     def test_limits_are_in_the_schema_not_the_prompt(self):
-        """Asking politely for five bullets is not a constraint. These are."""
+        """Asking politely for three bullets is not a constraint. These are."""
         schema = Feedback.model_json_schema()["properties"]
-        assert schema["fixes"]["maxItems"] == 5
         assert schema["missed_points"]["maxItems"] == 6
         assert schema["strengths"]["maxItems"] == 3
+        assert schema["fixed_since_last"]["maxItems"] == 3
+        assert "fixes" not in schema
+
+    def test_headline_is_required(self):
+        """The one thing to change is the part of the feedback meant to stick."""
+        assert "headline" in Feedback.model_json_schema()["required"]
+
+    def test_a_risky_claim_must_offer_a_rewording(self):
+        """Being told a claim is risky without a safer line to use instead
+        leaves the candidate with nothing to say next time."""
+        defs = Feedback.model_json_schema()["$defs"]["RiskyClaim"]
+        assert set(defs["required"]) == {"quote", "why", "say_instead"}
 
     def test_story_patch_is_optional(self):
         """Most answers add nothing new, and a forced patch would invent one."""

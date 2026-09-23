@@ -11,7 +11,7 @@ from - is carried by the ids, which the schema then requires back.
 
 `Feedback.model_json_schema()` is handed to the CLI as --json-schema and the same
 class validates the reply, so there is no drift between what we ask for and what
-we accept. Length limits on `fixes` and `missed_points` are schema constraints,
+we accept. Length limits on `missed_points` and `strengths` are schema constraints,
 not requests in the prompt.
 """
 

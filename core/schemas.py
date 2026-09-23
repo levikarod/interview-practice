@@ -162,6 +162,8 @@ class RiskyClaim(Strict):
     quote: str = Field(description="What they actually said, verbatim.")
     why: str = Field(description="Why it is risky: contradicts a guardrail, "
                                  "cites a stale figure, or cannot be defended.")
+    say_instead: str = Field(description="A defensible rewording in the "
+                                         "candidate's own voice, one sentence.")
 
 
 class StarCoverage(Strict):
@@ -190,6 +192,15 @@ class StoryPatch(Strict):
 
 
 class Feedback(Strict):
+    headline: str = Field(
+        description="The single most important change for next time. One "
+                    "imperative sentence under 20 words.",
+    )
+    fixed_since_last: list[str] = Field(
+        default_factory=list, max_length=3,
+        description="Only when a previous attempt is supplied: what that attempt "
+                    "missed or got wrong that this one gets right.",
+    )
     missed_points: list[MissedPoint] = Field(
         default_factory=list, max_length=6,
         description="The core output. Material from their stories they left on "
@@ -198,10 +209,6 @@ class Feedback(Strict):
     risky_claims: list[RiskyClaim] = Field(default_factory=list, max_length=6)
     star_coverage: StarCoverage
     strengths: list[str] = Field(default_factory=list, max_length=3)
-    fixes: list[str] = Field(
-        default_factory=list, max_length=5,
-        description="Imperative, specific, under 20 words each.",
-    )
     story_patch: StoryPatch | None = None
 
 
