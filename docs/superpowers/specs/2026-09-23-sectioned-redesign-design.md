@@ -119,7 +119,7 @@ section is removed.
 - **To review** tray: pending story additions from past runs. Each shows current
   and proposed text per section with a checkbox per section. Accept or Dismiss.
 - Accept rules (`core/patches.py`, pure function
-  `apply_patch(story: Story | None, patch: StoryPatch, sections: list[str]) -> Story`):
+  `apply_patch(story: Story | None, patch: StoryPatch, sections: list[str], source: str) -> Story`):
   - Only the chosen sections are written, and only when the patch value is non-empty.
   - A `stub` becomes `draft`. A `verified` story being changed also returns to
     `draft`, because its wording is no longer what a human confirmed.
@@ -183,9 +183,11 @@ element; everything else stays quiet.
 | ink | `#1B2330` | text |
 | muted | `#5E6A7A` | secondary text |
 | on-air | `#E0402F` | recording lamp only |
-| landed | `#2E7D5B` | green feedback |
-| table | `#B7791F` | amber feedback |
+| landed | `#26694C` | green feedback |
+| table | `#8A570F` | amber feedback |
 | challenged | `#B03A2E` | brick feedback, distinct from on-air |
+
+Landed and table were darkened from #2E7D5B / #B7791F so text meets AA on paper.
 
 Dark-mode equivalents are defined as tokens under `prefers-color-scheme: dark`.
 

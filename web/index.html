@@ -4,122 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Interview Practice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600&family=Public+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-
-<header>
-  <h1>Interview Practice</h1>
-  <p class="sub">Answer out loud. Get told what you had and didn't say. &nbsp;·&nbsp; <a href="/questions">Questions</a></p>
-</header>
-
-<div id="sample-banner" class="banner" hidden>
-  <strong>Sample data.</strong>
-  You're practising against a fictional engineer's CV.
-  Run <code>uv run python -m core.ingest your-cv.pdf</code> to use your own.
-</div>
-
-<div id="ingest-banner" class="banner" hidden>
-  <strong>Setup unfinished.</strong>
-  Found your <code>cv.md</code>, but nothing has been derived from it yet —
-  so there are no stories to check your answers against.
-  Run <code>uv run python -m core.ingest</code> to build the story bank.
-</div>
-
-<div id="model-banner" class="banner" hidden>
-  <strong>First run downloads the speech model</strong>
-  (<span id="model-name"></span>, ~0.5&nbsp;GB). It happens once, on your first
-  answer, and takes a couple of minutes. Nothing is broken.
-</div>
-
-<main>
-
-  <section class="card" id="practice">
-    <h2>Practice</h2>
-
-    <div id="idle">
-      <p class="muted">Ready when you are.</p>
-      <button id="start" class="primary">Start a question</button>
-    </div>
-
-    <div id="asked" hidden>
-      <p class="question" id="question-text"></p>
-      <p class="muted small" id="question-meta"></p>
-
-      <div class="controls">
-        <button id="record" class="primary">Record answer</button>
-        <button id="stop" class="danger" hidden>Stop</button>
-        <button id="skip" class="ghost">Different question</button>
-        <span id="timer" class="timer" hidden>0:00</span>
-      </div>
-      <div class="meter" id="meter" hidden><div class="meter-fill" id="meter-fill"></div></div>
-      <p class="muted small" id="record-hint" hidden>
-        Recording stops automatically when the timer runs out.
-      </p>
-    </div>
-
-    <div id="working" hidden>
-      <p class="stage" id="stage-label">Working…</p>
-      <ol class="stages">
-        <li data-stage="transcribing">Transcribing locally</li>
-        <li data-stage="measuring">Measuring delivery</li>
-        <li data-stage="analysing">Checking against your stories</li>
-        <li data-stage="done">Done</li>
-      </ol>
-    </div>
-
-    <div id="result" hidden>
-      <h3 id="result-question"></h3>
-      <div class="stats" id="stats"></div>
-
-      <div id="feedback">
-        <section class="fb" id="fb-missed" hidden>
-          <h4>What you had and didn't say</h4>
-          <ul id="missed"></ul>
-        </section>
-
-        <section class="fb risky" id="fb-risky" hidden>
-          <h4>Wouldn't survive a follow-up</h4>
-          <ul id="risky"></ul>
-        </section>
-
-        <section class="fb" id="fb-fixes" hidden>
-          <h4>Next time</h4>
-          <ol id="fixes"></ol>
-        </section>
-
-        <section class="fb" id="fb-strengths" hidden>
-          <h4>Worked</h4>
-          <ul id="strengths"></ul>
-        </section>
-
-        <p class="star" id="star"></p>
-      </div>
-
-      <details class="raw">
-        <summary>What you said</summary>
-        <p class="transcript" id="transcript"></p>
-      </details>
-
-      <button id="again" class="primary">Next question</button>
-    </div>
-
-    <p id="practice-error" class="error" hidden></p>
-  </section>
-
-  <section class="card">
-    <h2>Profile</h2>
-    <dl id="profile-summary"><dd class="muted">Loading…</dd></dl>
-  </section>
-
-  <section class="card">
-    <h2>Story bank</h2>
-    <p class="muted" id="story-progress"></p>
-    <ul id="story-list"></ul>
-  </section>
-
-</main>
-
-<script src="/static/app.js"></script>
+<nav class="rail" aria-label="Sections">
+  <a class="brand" href="#/practice">Interview practice</a>
+  <a href="#/practice" data-section="practice">Practice</a>
+  <a href="#/questions" data-section="questions">Questions</a>
+  <a href="#/stories" data-section="stories">Stories <span class="count" hidden></span></a>
+  <a href="#/profile" data-section="profile">Profile</a>
+</nav>
+<main id="view"></main>
+<script type="module" src="/static/app.js"></script>
 </body>
 </html>
