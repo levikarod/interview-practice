@@ -109,3 +109,80 @@ class TestStoryAdditions:
         assert own_profile.post("/api/story-additions/r1/dismiss").status_code == 200
         assert own_profile.get("/api/story-additions").json() == []
         assert own_profile.get(f"/api/stories/{story_id}").json()["action"] == ""
+
+
+def upload(client, name: str, data: bytes, replace: bool = False):
+    return client.post("/api/cv", files={"file": (name, data)},
+                       data={"replace": "true" if replace else "false"})
+
+
+class TestCvUpload:
+    def test_formatted_markdown_needs_no_model_call(self, client):
+        """The autouse guard fails any real model call, so a 200 proves none ran."""
+        response = upload(client, "cv.md", SAMPLE_CV.encode())
+        assert response.status_code == 200
+        assert response.json()["markdown"].startswith("# Mara Okonjo")
+        assert (profile_store.REAL_DIR / "cv.md").exists()
+
+    def test_plain_text_is_converted_by_one_model_call(self, client, fake_llm):
+        fake = fake_llm(text="# Ana Ruiz\n")
+        response = upload(client, "cv.txt", b"Ana Ruiz, backend engineer.")
+        assert response.json()["markdown"] == "# Ana Ruiz\n"
+        assert len(fake.calls) == 1
+
+    def test_an_existing_cv_is_not_replaced_without_asking(self, client):
+        upload(client, "cv.md", SAMPLE_CV.encode())
+        assert upload(client, "cv.md", SAMPLE_CV.encode()).status_code == 409
+        assert upload(client, "cv.md", SAMPLE_CV.encode(), replace=True).status_code == 200
+
+    def test_unsupported_file_is_400(self, client):
+        assert upload(client, "cv.docx", b"PK").status_code == 400
+
+
+class TestCvBuild:
+    def test_save_then_build_makes_a_story_bank(self, client):
+        client.put("/api/cv", json={"markdown": SAMPLE_CV})
+        result = client.post("/api/cv/build").json()
+        assert result["roles"] > 0
+        assert result["stubs_created"] > 0
+        profile = client.get("/api/profile").json()
+        assert profile["is_example"] is False
+        assert profile["needs_ingest"] is False
+
+    def test_cv_without_roles_is_rejected_before_anything_is_written(self, client):
+        """Otherwise the profile reads as ready with nothing in it."""
+        client.put("/api/cv", json={"markdown": "# Ana Ruiz\n\nNo roles here.\n"})
+        response = client.post("/api/cv/build")
+        assert response.status_code == 422
+        assert "Experience" in response.json()["detail"]
+        assert not (profile_store.REAL_DIR / "cv.json").exists()
+
+    def test_empty_cv_is_400(self, client):
+        assert client.put("/api/cv", json={"markdown": "   "}).status_code == 400
+
+    def test_building_with_no_cv_is_409(self, client):
+        assert client.post("/api/cv/build").status_code == 409
+
+    def test_get_returns_the_active_cv(self, client):
+        assert client.get("/api/cv").json()["markdown"].startswith("# Mara Okonjo")
+
+
+class TestGuardrails:
+    def test_sample_profile_guardrails_are_read_only(self, client):
+        before = (profile_store.EXAMPLE_DIR / "guardrails.md").read_text(encoding="utf-8")
+        assert client.get("/api/guardrails").json()["editable"] is False
+        assert client.put("/api/guardrails", json={"markdown": "x"}).status_code == 409
+        after = (profile_store.EXAMPLE_DIR / "guardrails.md").read_text(encoding="utf-8")
+        assert before == after
+
+    def test_saved_on_your_own_profile(self, own_profile):
+        own_profile.put("/api/guardrails", json={"markdown": "Never say I led it."})
+        got = own_profile.get("/api/guardrails").json()
+        assert got == {"markdown": "Never say I led it.", "editable": True}
+
+
+class TestProfile:
+    def test_reports_numbers_to_defend(self, own_profile):
+        profile = own_profile.get("/api/profile").json()
+        assert isinstance(profile["unsourced_metrics"], list)
+        assert profile["pending_additions"] == 0

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import tempfile
 import uuid
 from datetime import date
 from pathlib import Path
@@ -89,6 +90,92 @@ def get_profile() -> dict:
         "unsourced_metrics": ingest.unsourced_metrics(profile),
         "pending_additions": len(db.pending_patches()),
     }
+
+
+NO_ROLES = ("No roles were found. Each role needs a '### Title, Employer "
+            "(Location) (Dates)' heading under '## Experience'. Compare it with "
+            "the sample CV's layout, then build again.")
+
+
+@app.post("/api/cv")
+async def upload_cv(file: UploadFile, replace: bool = Form(False)) -> dict:
+    """Convert an uploaded CV into cv.md and return it for review.
+
+    The upload lives in a temporary folder only while it is read, so the
+    original file is not kept. Conversion is a model call, so it runs off the
+    event loop.
+    """
+    suffix = Path(file.filename or "cv.txt").suffix.lower()
+    data = await file.read()
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / f"cv{suffix}"
+        source.write_bytes(data)
+        try:
+            markdown = await asyncio.to_thread(
+                ingest.ingest_file, source, profile_store.REAL_DIR, None, replace)
+        except ingest.CvAlreadyExists as exc:
+            raise HTTPException(409, "You already have a CV. Replace it?") from exc
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+    return {"markdown": markdown}
+
+
+@app.get("/api/cv")
+def get_cv() -> dict:
+    try:
+        return {"markdown": profile_store.load_cv_markdown()}
+    except ProfileNotSetUp:
+        return {"markdown": ""}
+
+
+@app.put("/api/cv")
+def save_cv(payload: dict = Body(...)) -> dict:
+    markdown = str(payload.get("markdown") or "")
+    if not markdown.strip():
+        raise HTTPException(400, "The CV is empty.")
+    profile_store.REAL_DIR.mkdir(parents=True, exist_ok=True)
+    (profile_store.REAL_DIR / "cv.md").write_text(markdown, encoding="utf-8")
+    return {"saved": True}
+
+
+@app.post("/api/cv/build")
+def build_cv() -> dict:
+    """cv.md to profile and story stubs: the same `derive` the CLI runs.
+
+    Parsed first and refused when no roles come out, so a misread CV never
+    leaves behind a cv.json that makes an empty profile look finished.
+    """
+    source = profile_store.REAL_DIR / "cv.md"
+    if not source.exists():
+        raise HTTPException(409, "Upload a CV first.")
+    if not ingest.parse_cv_markdown(source.read_text(encoding="utf-8")).roles:
+        raise HTTPException(422, NO_ROLES)
+
+    result = ingest.derive(profile_store.REAL_DIR)
+    return {
+        "roles": result["roles"],
+        "bullets": result["bullets"],
+        "stubs_created": len(result["stubs_created"]),
+        "stories_kept": len(result["stories_kept"]),
+        "unsourced_metrics": result["unsourced_metrics"],
+    }
+
+
+@app.get("/api/guardrails")
+def get_guardrails() -> dict:
+    try:
+        return {"markdown": profile_store.load_guardrails(),
+                "editable": not profile_store.is_example()}
+    except ProfileNotSetUp:
+        return {"markdown": "", "editable": False}
+
+
+@app.put("/api/guardrails")
+def save_guardrails(payload: dict = Body(...)) -> dict:
+    directory = _writable_dir()
+    (directory / "guardrails.md").write_text(str(payload.get("markdown") or ""),
+                                             encoding="utf-8")
+    return {"saved": True}
 
 
 @app.get("/api/stories")
