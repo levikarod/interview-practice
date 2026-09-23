@@ -58,6 +58,29 @@ class TestPayload:
         text = analyze.build_payload(QUESTION, Transcript(text="  "), [], EXAMPLE)
         assert "nothing was transcribed" in text
 
+    def test_previous_attempt_is_included_when_given(self):
+        previous = {"headline": "Name the lock.",
+                    "missed_points": [{"point": "the 409 on replay",
+                                       "source_story_id": "vanta-idempotency-keys"}],
+                    "risky_claims": [{"quote": "I led it", "why": "w",
+                                      "say_instead": "s"}]}
+        text = analyze.build_payload(QUESTION, SAID, [], EXAMPLE, previous=previous)
+        assert "## Their previous attempt at this question" in text
+        assert "Name the lock." in text
+        assert "the 409 on replay" in text
+        assert "I led it" in text
+
+    def test_no_previous_section_on_a_first_attempt(self, payload):
+        assert "previous attempt" not in payload.lower()
+
+    def test_previous_attempt_from_before_the_schema_change_still_renders(self):
+        """Runs stored before `headline` existed carry `fixes` instead. They are
+        read raw from SQLite, so the payload builder meets that shape."""
+        previous = {"fixes": ["Lead with the number."], "missed_points": [],
+                    "risky_claims": [{"quote": "q", "why": "w"}]}
+        text = analyze.build_payload(QUESTION, SAID, [], EXAMPLE, previous=previous)
+        assert "Lead with the number." in text
+
     def test_stays_small(self, payload):
         """Our content is a few thousand tokens against tens of thousands of
         harness overhead. If this balloons, something is being dumped in."""

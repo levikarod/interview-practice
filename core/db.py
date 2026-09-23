@@ -108,6 +108,16 @@ def history(question_id: str | None = None, limit: int = 20,
     ]
 
 
+def latest_feedback(question_id: str, path: Path | None = None) -> dict | None:
+    """The most recent feedback for one question, read raw.
+
+    Raw rather than validated: runs stored before a schema change must still
+    serve as the previous attempt.
+    """
+    rows = history(question_id, 1, path)
+    return rows[0]["feedback"] if rows else None
+
+
 def totals(path: Path | None = None) -> dict:
     """Answer count and total spend, for the footer."""
     with connect(path) as conn:

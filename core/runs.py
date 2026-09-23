@@ -128,8 +128,9 @@ async def process(run: Run) -> None:
 
         if question is not None:
             await _set_stage(run, "analysing")
+            previous = await asyncio.to_thread(db.latest_feedback, run.question_id)
             feedback, completion = await asyncio.to_thread(
-                analyze_mod.analyse, question, transcript
+                analyze_mod.analyse, question, transcript, previous=previous
             )
             run.feedback = feedback
             run.cost_usd = completion.cost_usd

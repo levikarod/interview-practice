@@ -69,6 +69,27 @@ class TestPipeline:
         assert run.feedback is not None
         assert run.cost_usd == 0.21
 
+    async def test_a_retry_is_shown_the_previous_attempt(self, fake_transcribe,
+                                                         tmp_path, monkeypatch,
+                                                         fake_analysis):
+        """Crediting what improved needs the last attempt in the same call."""
+        from core.llm import Completion
+
+        seen = []
+
+        def capture(question, transcript, **kwargs):
+            seen.append(kwargs.get("previous"))
+            return fake_analysis, Completion(model="fake")
+
+        monkeypatch.setattr(runs.analyze_mod, "analyse", capture)
+        fake_transcribe()
+        for _ in range(2):
+            run = runs.create_run("idempotency", tmp_path / "a.webm")
+            await runs.process(run)
+
+        assert seen[0] is None
+        assert seen[1]["headline"] == "Tighten it."
+
     async def test_done_event_reports_the_done_stage(self, fake_transcribe, tmp_path):
         """The snapshot used to be built before the stage was set, so the 'done'
         event carried stage 'measuring'. Anything trusting the embedded snapshot

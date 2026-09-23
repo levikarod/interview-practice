@@ -12,6 +12,8 @@ factory with a canned response.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from core import llm
@@ -39,3 +41,21 @@ def fake_llm(monkeypatch):
         monkeypatch.setattr(llm, "get_client", lambda *a, **k: client)
         return client
     return _install
+
+
+@pytest.fixture
+def record_run():
+    """Write a finished run straight to a database, skipping the pipeline."""
+    from core import db
+
+    def _record(path, run_id, at=1.0, headline="h", patch=None,
+                question_id="idempotency"):
+        feedback = {"headline": headline, "missed_points": [], "risky_claims": [],
+                    "story_patch": patch}
+        run = SimpleNamespace(
+            id=run_id, question_id=question_id, started_at=at, transcript=None,
+            metrics=None, feedback=SimpleNamespace(model_dump=lambda: feedback),
+            cost_usd=0.0, audio_path="a.webm",
+        )
+        db.save_run(run, path)
+    return _record

@@ -49,8 +49,21 @@ def _render_story(scored: retrieve.Scored) -> str:
     return "\n".join(lines)
 
 
+def _render_previous(previous: dict) -> str:
+    lines = []
+    if previous.get("headline"):
+        lines.append(f"The one thing they were told: {previous['headline']}")
+    lines += [f"- fix: {fix}" for fix in previous.get("fixes") or []]
+    lines += [f"- missed: {p.get('point', '')} [{p.get('source_story_id', '')}]"
+              for p in previous.get("missed_points") or []]
+    lines += [f'- risky: "{r.get("quote", "")}"'
+              for r in previous.get("risky_claims") or []]
+    return "\n".join(lines) or "(no findings were recorded)"
+
+
 def build_payload(question: Question, transcript: Transcript,
-                  stories: list[Story], directory: Path | None = None) -> str:
+                  stories: list[Story], directory: Path | None = None,
+                  previous: dict | None = None) -> str:
     """Assemble everything the model sees, apart from the system prompt."""
     profile = profile_store.load_profile(directory)
     guardrails = profile_store.load_guardrails(directory).strip()
@@ -78,20 +91,27 @@ def build_payload(question: Question, transcript: Transcript,
         parts += ["", "## Guardrails", "(none set. Flag only overclaiming that "
                   "contradicts the stories above.)"]
 
+    if previous:
+        parts += ["", "## Their previous attempt at this question",
+                  _render_previous(previous)]
+
     return "\n".join(parts)
 
 
 def analyse(question: Question, transcript: Transcript,
             stories: list[Story] | None = None,
             client: LLMClient | None = None,
-            directory: Path | None = None) -> tuple[Feedback, Completion]:
+            directory: Path | None = None,
+            previous: dict | None = None) -> tuple[Feedback, Completion]:
     """Review one answer. Returns the feedback and the raw completion.
 
     The completion is returned alongside so the caller can record what the call
-    cost without this module needing to know about storage.
+    cost without this module needing to know about storage. `previous` is the
+    last stored feedback for this question, so the model can credit what
+    improved.
     """
     stories = profile_store.load_stories(directory) if stories is None else stories
-    payload = build_payload(question, transcript, stories, directory)
+    payload = build_payload(question, transcript, stories, directory, previous)
 
     client = client or llm.get_client()
     completion = client.complete(
