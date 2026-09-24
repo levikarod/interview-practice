@@ -53,6 +53,8 @@ the bundled sample profile, reproducible on a fresh clone in about a minute.
 
 ## Quick start
 
+The terminal step is the install. Everything after it happens in the browser.
+
 ```bash
 git clone https://github.com/levikarod/interview-practice
 cd interview-practice
@@ -60,23 +62,31 @@ uv sync
 uv run uvicorn main:app --reload
 ```
 
-Open <http://localhost:8000>. With no profile set up it runs on
+Open <http://localhost:8000>. The app starts on **Profile**.
+
+1. **Start with your CV.** Drop in a PDF, Markdown or text file. One model call
+   converts it, about half a minute — a CV already in this repo's format skips
+   the model entirely. **Check your CV** shows you what was read, so a misread
+   job title gets fixed before it becomes a story.
+2. **Build story bank.** Every achievement on your CV becomes a story. You land
+   on a page with those stories, the numbers you'll be asked to defend, and a
+   guardrails box to fill in.
+3. **Start practising.** **Start a question** clears the screen down to the
+   question and the timer. **Record answer** asks the browser for your
+   microphone. Your first answer downloads the speech model (~0.5 GB, a couple
+   of minutes, once) — the Practice page says so before you start.
+
+Then the feedback. Story additions drawn from your answers collect in
+**Stories** for review.
+
+**Just looking?** *practise on sample data* runs the whole loop on
 `profile.example/` — a fictional engineer with a CV, six stories and guardrails
 already in place.
 
-Then open **Profile** and upload your own CV (PDF, Markdown or plain text). You
-check what was read, click **Build story bank**, and you're practising on your
-own material.
-
-The same thing works from the command line if you prefer:
-
-```bash
-uv run python -m core.ingest ~/path/to/cv.pdf
-```
-
 **Requires** Python 3.11+, [uv](https://docs.astral.sh/uv/), and a Chromium
-browser. For feedback you also need the Claude Code CLI installed and logged in
-(2.1.205+), or `ANTHROPIC_API_KEY` with `LLM_BACKEND=api`.
+browser. Feedback needs the Claude Code CLI installed and logged in (2.1.205+),
+or `ANTHROPIC_API_KEY` with `LLM_BACKEND=api`. Ingestion also works from the
+command line: `uv run python -m core.ingest ~/path/to/cv.pdf`.
 
 ## What it does
 
@@ -146,13 +156,16 @@ material doesn't have to be.
 | `cv.md` | **Source of truth.** Generated from your PDF, then yours to edit |
 | `cv.json` | Derived cache. Re-derived whenever `cv.md` changes |
 | `stories/*.md` | One story per CV bullet, `stub → draft → verified` |
-| `guardrails.md` | Claims you can't defend and figures that are stale |
+| `guardrails.md` | Claims you can't defend and figures that are stale. Edited in **Profile** |
 | `questions.yaml` | Your questions, overriding the shipped bank by id |
 
 A story starts as a **stub** — it knows what you *claim*, but not the story
 behind it. That's already enough for feedback to say *"your CV claims 20+
 repositories and you never mentioned the number."* Each answer fills in the
 empty sections.
+
+Additions the analysis proposes wait in **Stories** under *To review*, where you
+tick the parts worth keeping. Nothing reaches a file until you accept it.
 
 <details>
 <summary><b>How ingestion works</b> — PDF, Markdown or text → one format</summary>
