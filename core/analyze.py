@@ -10,9 +10,10 @@ parsed by one, and the structure that matters - which story an observation came
 from - is carried by the ids, which the schema then requires back.
 
 `Feedback.model_json_schema()` is handed to the CLI as --json-schema and the same
-class validates the reply, so there is no drift between what we ask for and what
-we accept. Length limits on `missed_points` and `strengths` are schema constraints,
-not requests in the prompt.
+class validates the reply. Brevity limits ride along in that schema rather than
+being asked for in the prompt, but they are not enforced on the way back: the
+run is only saved once this function returns, so rejecting an over-long reply
+would cost the transcript and the metrics too. See `schemas.brief`.
 """
 
 from __future__ import annotations

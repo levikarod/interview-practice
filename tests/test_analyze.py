@@ -129,7 +129,7 @@ class TestSchemaConstraints:
     def test_limits_are_in_the_schema_not_the_prompt(self):
         """Asking politely for three bullets is not a constraint. These are."""
         schema = Feedback.model_json_schema()["properties"]
-        assert schema["missed_points"]["maxItems"] == 6
+        assert schema["missed_points"]["maxItems"] == 3
         assert schema["strengths"]["maxItems"] == 3
         assert schema["fixed_since_last"]["maxItems"] == 3
         assert "fixes" not in schema
@@ -153,3 +153,65 @@ class TestSchemaConstraints:
         avoid."""
         defs = Feedback.model_json_schema()["$defs"]["MissedPoint"]
         assert set(defs["required"]) == {"point", "source_story_id"}
+
+
+class TestBrevity:
+    """Verbosity is this output's failure mode.
+
+    Feedback is read in the gap between two attempts at the same question. A
+    finding that runs to three lines does not get read, so the caps are part of
+    the contract rather than a matter of taste.
+    """
+
+    def test_every_finding_carries_a_length_cap(self):
+        """A sentence in the prompt asking for brevity is not a constraint.
+        The schema reaches the decoder; the prompt only asks."""
+        schema = Feedback.model_json_schema()
+        defs = schema["$defs"]
+
+        assert schema["properties"]["headline"]["maxLength"] == 110
+        assert defs["MissedPoint"]["properties"]["point"]["maxLength"] == 120
+        assert defs["RiskyClaim"]["properties"]["why"]["maxLength"] == 100
+        assert defs["RiskyClaim"]["properties"]["say_instead"]["maxLength"] == 100
+
+    def test_the_free_text_lists_cap_their_items_too(self):
+        """A cap on the list length says nothing about how long each entry
+        runs, which is where the verbosity actually lives."""
+        props = Feedback.model_json_schema()["properties"]
+        assert props["strengths"]["items"]["maxLength"] == 80
+        assert props["fixed_since_last"]["items"]["maxLength"] == 100
+
+    def test_there_are_at_most_three_of_anything(self):
+        """Six findings is a list you skim. Three is a list you act on."""
+        props = Feedback.model_json_schema()["properties"]
+        assert props["missed_points"]["maxItems"] == 3
+        assert props["risky_claims"]["maxItems"] == 3
+        assert props["strengths"]["maxItems"] == 3
+        assert props["fixed_since_last"]["maxItems"] == 3
+
+
+class TestOvershootIsAcceptedAnyway:
+    """The caps are asked for, never enforced on the way back.
+
+    `runs.py` saves the run only after `analyse` returns, so rejecting a reply
+    that overshoots by one character would throw away the transcript and the
+    delivery metrics along with the feedback. Long feedback beats no feedback.
+    """
+
+    @staticmethod
+    def _feedback(**over):
+        return Feedback.model_validate({**VALID, **over})
+
+    def test_an_over_long_headline_still_validates(self):
+        assert self._feedback(headline="x" * 500).headline
+
+    def test_an_over_long_missed_point_still_validates(self):
+        point = {"point": "y" * 500, "source_story_id": "vanta-idempotency-keys"}
+        assert self._feedback(missed_points=[point]).missed_points
+
+    def test_more_findings_than_asked_for_still_validate(self):
+        point = {"point": "y", "source_story_id": "vanta-idempotency-keys"}
+        assert len(self._feedback(missed_points=[point] * 10).missed_points) == 10
+
+    def test_an_over_long_strength_still_validates(self):
+        assert self._feedback(strengths=["z" * 500]).strengths

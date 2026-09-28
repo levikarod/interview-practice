@@ -4,14 +4,16 @@ These models do double duty: `model_json_schema()` produces the schema handed to
 `claude --json-schema`, and `model_validate()` checks what comes back. One
 declaration, no drift between what we ask for and what we accept.
 
-Constraints expressed here (list lengths, string lengths) are enforced by the
-schema rather than requested politely in the prompt.
+Constraints expressed here travel to the model inside the schema rather than
+being requested politely in the prompt. Two kinds: the ones on `Question` and
+the profile are enforced on the way back, and the ones on `Feedback` are asked
+for and not enforced - see `brief` for why those differ.
 """
 
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,6 +27,27 @@ class Strict(BaseModel):
     `additionalProperties: false`, which structured outputs require."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+def brief(limit: int, **field: Any) -> Any:
+    """A length the model is asked for and not held to.
+
+    The cap reaches the model inside the JSON Schema, which shortens what comes
+    back far more reliably than a sentence in the prompt asking for brevity.
+
+    It is deliberately not a Pydantic constraint. `runs.py` saves the run only
+    once `analyse` has returned, so rejecting a reply that overran by one
+    character would throw away the transcript and the delivery metrics along
+    with the feedback, and the candidate would have to record the answer again.
+    Ask strictly, accept leniently.
+    """
+    return Field(json_schema_extra={"maxLength": limit}, **field)
+
+
+def at_most(limit: int, **field: Any) -> Any:
+    """The same bargain applied to how many findings, not how long each runs."""
+    return Field(default_factory=list, json_schema_extra={"maxItems": limit},
+                 **field)
 
 
 
@@ -153,16 +176,20 @@ class Profile(Strict):
 
 
 class MissedPoint(Strict):
-    point: str = Field(description="Something in the candidate's own stories "
-                                   "they had available and did not say.")
+    point: str = brief(120,
+                       description="Something in the candidate's own stories "
+                                   "they had available and did not say. One "
+                                   "sentence naming the concrete thing.")
     source_story_id: str
 
 
 class RiskyClaim(Strict):
     quote: str = Field(description="What they actually said, verbatim.")
-    why: str = Field(description="Why it is risky: contradicts a guardrail, "
+    why: str = brief(100,
+                     description="Why it is risky: contradicts a guardrail, "
                                  "cites a stale figure, or cannot be defended.")
-    say_instead: str = Field(description="A defensible rewording in the "
+    say_instead: str = brief(100,
+                             description="A defensible rewording in the "
                                          "candidate's own voice, one sentence.")
 
 
@@ -193,23 +220,32 @@ class StoryPatch(Strict):
 
 
 class Feedback(Strict):
-    headline: str = Field(
+    """What comes back from the one model call.
+
+    Read in the gap between two attempts at the same question, which is why
+    every free-text field here is capped: three short findings get acted on,
+    six long ones get skimmed. `RiskyClaim.quote` is the one exception - it is
+    the candidate's own words, and a cap would force a misquote.
+    """
+
+    headline: str = brief(
+        110,
         description="The single most important change for next time. One "
-                    "imperative sentence under 20 words.",
+                    "imperative sentence.",
     )
-    fixed_since_last: list[str] = Field(
-        default_factory=list, max_length=3,
+    fixed_since_last: list[Annotated[str, brief(100)]] = at_most(
+        3,
         description="Only when a previous attempt is supplied: what that attempt "
                     "missed or got wrong that this one gets right.",
     )
-    missed_points: list[MissedPoint] = Field(
-        default_factory=list, max_length=6,
+    missed_points: list[MissedPoint] = at_most(
+        3,
         description="The core output. Material from their stories they left on "
                     "the table.",
     )
-    risky_claims: list[RiskyClaim] = Field(default_factory=list, max_length=6)
+    risky_claims: list[RiskyClaim] = at_most(3)
     star_coverage: StarCoverage
-    strengths: list[str] = Field(default_factory=list, max_length=3)
+    strengths: list[Annotated[str, brief(80)]] = at_most(3)
     story_patch: StoryPatch | None = None
 
 

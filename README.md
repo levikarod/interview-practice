@@ -316,7 +316,7 @@ All optional; every one has a working default.
 ## Development
 
 ```bash
-uv run pytest                    # 170 tests, none make a model call
+uv run pytest                    # 188 tests, none make a model call
 uv run uvicorn main:app --reload
 ```
 

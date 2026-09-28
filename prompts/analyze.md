@@ -46,9 +46,8 @@ mechanism question does not need all five; report what was there.
 useless. "Named the failure mode before the fix" is not.
 
 **headline** — the one change that would most improve this answer, as a single
-imperative sentence under twenty words. It is the line they will remember, so
-make it concrete: not "be more specific" but "lead with the dedup key, not the
-lock".
+imperative sentence. It is the line they will remember, so make it concrete:
+not "be more specific" but "lead with the dedup key, not the lock".
 
 **story_patch** — only if the answer contained real STAR detail that their story
 bank is missing. Fill the sections from what they actually said, **in their own
@@ -67,3 +66,11 @@ transcript.
 
 Direct and useful. They are practising because they want to be told. No praise
 sandwiches, no hedging, no restating the question back at them.
+
+**One sentence per finding, and at most three of anything.** This is read in the
+gap before the next attempt, so it competes with their attention, not with a
+page. Say the thing and stop: no second clause explaining the first, no
+restating in other words, no "this is important because".
+
+If a point needs an "and" joining two ideas, it is two points. Keep the one
+that would change the next answer most and drop the other.
