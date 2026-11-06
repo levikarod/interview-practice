@@ -23,9 +23,12 @@ filler metrics in plain code, retrieves relevant stories by tag overlap, and mak
 Progress streams back over SSE.
 
 **SQLite holds what happened** (sessions, transcripts, feedback, cost).
-**Markdown holds what you know** (`profile/`: cv.md, stories, guardrails), so the
-profile stays git-diffable and the AI's proposed additions arrive as reviewable
-diffs.
+**Markdown holds what you know** (`profile/`: cv.md, stories, guardrails, and
+`jds/` for the job postings you've drafted questions from), so the profile stays
+git-diffable and the AI's proposed additions arrive as reviewable diffs.
+
+Questions kept from a posting carry its `jd_id`. Practising one role is a filter
+on the one bank (`#/practice/jd/<id>`), not a second bank.
 
 Story additions the analysis proposes stay inside the run's stored feedback until
 accepted or dismissed; `patch_decisions` records that decision, and only an

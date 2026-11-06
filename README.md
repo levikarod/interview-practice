@@ -203,6 +203,10 @@ these** — or pick the role from **Questions from** on the Practice page. Every
 question in that session comes from that set, including after you've been
 through them all and it starts over.
 
+**Straight from the posting.** On Practice, **Practise for a job** takes the
+posting, keeps every question drafted from it, and puts you on the first one.
+Trim or rename the set on the Questions page afterwards.
+
 **Two layers.** `questions/core.yaml` is committed and works for anyone. Yours
 live in gitignored `profile/questions.yaml` and win on id collision — so editing
 a shipped question writes an override, and `git pull` never fights your edits.

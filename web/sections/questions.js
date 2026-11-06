@@ -1,4 +1,5 @@
 import { api, esc, json } from "../lib.js";
+import { POSTING_SOURCE, keepPosting, postingSource } from "../posting.js";
 
 let root;
 let state;
@@ -14,13 +15,7 @@ const TEMPLATE = `
   <section class="group">
     <h2>From a job description</h2>
     <p class="muted small">Questions are drafted where the role's requirements overlap your own material, plus a couple aimed at gaps worth rehearsing honestly. Nothing is saved until you pick, and the ones you keep stay together so you can practise just that role.</p>
-    <div class="actions jd-source">
-      <button id="jd-choose">Upload the posting</button>
-      <span class="muted small" id="jd-file">PDF, Markdown or text, or paste it below.</span>
-      <button id="jd-clear" hidden>Use pasted text instead</button>
-      <input type="file" id="jd-upload" accept=".pdf,.md,.txt" hidden>
-    </div>
-    <textarea id="jd" rows="7" placeholder="Paste the full posting. Responsibilities and requirements are where the questions come from."></textarea>
+    ${POSTING_SOURCE}
     <div class="actions">
       <button id="generate" class="primary">Draft questions</button>
       <span class="muted small" id="jd-status"></span>
@@ -227,28 +222,17 @@ function bind() {
     }
   });
 
-  const chooseFile = (file) => {
-    $("#jd-file").textContent = file ? file.name : "PDF, Markdown or text, or paste it below.";
-    $("#jd").disabled = Boolean(file);
-    show("#jd-clear", Boolean(file));
-  };
-  $("#jd-choose").onclick = () => $("#jd-upload").click();
-  $("#jd-upload").onchange = () => chooseFile($("#jd-upload").files[0]);
-  $("#jd-clear").onclick = () => { $("#jd-upload").value = ""; chooseFile(null); };
+  const source = postingSource(root);
 
   $("#generate").onclick = async () => {
     show("#jd-error", false);
     show("#drafted", false);
     $("#generate").disabled = true;
     $("#jd-status").textContent = "Reading the posting against your material…";
-    const body = new FormData();
-    const file = $("#jd-upload").files[0];
-    if (file) body.append("file", file);
-    else body.append("text", $("#jd").value.trim());
     try {
-      const result = await api("/api/jd/generate", { method: "POST", body });
+      const result = await source.draft();
       state.drafts = result.questions;
-      state.posting = { text: result.text, role_summary: result.role_summary };
+      state.posting = result;
       $("#jd-title").value = result.title;
       $("#role-summary").textContent = result.role_summary;
       $("#jd-status").textContent = `${result.questions.length} drafted, $${result.cost_usd}`;
@@ -274,21 +258,14 @@ function bind() {
     }
     let saved;
     try {
-      saved = await api("/api/jds", json("POST", {
-        title: $("#jd-title").value.trim(),
-        role_summary: state.posting.role_summary,
-        text: state.posting.text,
-        questions: chosen,
-      }));
+      saved = await keepPosting(state.posting, chosen, $("#jd-title").value.trim());
     } catch (err) {
       $("#jd-error").textContent = err.message;
       return show("#jd-error", true);
     }
     $("#jd-status").innerHTML = `Kept ${saved.added} for ${esc(saved.title || "this posting")}. <a href="#/practice/jd/${encodeURIComponent(saved.id)}">Practise them now</a>`;
     show("#drafted", false);
-    $("#jd").value = "";
-    $("#jd-upload").value = "";
-    chooseFile(null);
+    source.reset();
     loadBank(saved.id);
   };
 

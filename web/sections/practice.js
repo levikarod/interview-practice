@@ -1,4 +1,5 @@
 import { api, esc, mmss } from "../lib.js";
+import { POSTING_SOURCE, keepPosting, postingSource } from "../posting.js";
 
 const STAGES = [
   ["transcribing", "Transcribing locally"],
@@ -70,6 +71,7 @@ async function renderHome() {
   const lastQuestion = last && bank.find((q) => q.id === last.question_id);
   const s = profile.stories || { total: 0, draft: 0, verified: 0 };
   const scoped = jds.find((j) => j.id === state.jd);
+  const canDraft = profile.ready && !profile.is_example && !profile.needs_ingest;
 
   root.innerHTML = `
   <section class="home">
@@ -85,6 +87,16 @@ async function renderHome() {
     </label>
     ${scoped?.role_summary ? `<p class="muted small">${esc(scoped.role_summary)}</p>` : ""}` : ""}
     <button class="primary big" data-act="start">Start a question</button>
+    ${canDraft ? `
+    <details class="for-job">
+      <summary>Practise for a job</summary>
+      <p class="muted small">Give it the posting and you go straight to questions drafted from it, where the role meets your own material. You can rename the set or turn questions off on the Questions page.</p>
+      ${POSTING_SOURCE}
+      <div class="actions">
+        <button class="primary" data-act="for-job">Read it and start</button>
+        <span class="muted small" data-act="for-job-status"></span>
+      </div>
+    </details>` : ""}
     <dl class="tally">
       <div><dt>Answers given</dt><dd>${history.totals.runs}</dd></div>
       <div><dt>Stories verified</dt><dd>${s.verified} of ${s.total}</dd></div>
@@ -104,6 +116,33 @@ async function renderHome() {
   const scope = $("[data-act=scope]");
   if (scope) scope.onchange = () => {
     location.hash = scope.value ? `#/practice/jd/${encodeURIComponent(scope.value)}` : "#/practice";
+  };
+  if (canDraft) bindForJob();
+}
+
+function bindForJob() {
+  const panel = $(".for-job");
+  const source = postingSource(panel);
+  const go = $("[data-act=for-job]");
+  const status = $("[data-act=for-job-status]");
+  go.onclick = async () => {
+    $(".error").hidden = true;
+    go.disabled = true;
+    status.textContent = "Reading the posting against your material. This takes about a minute.";
+    try {
+      const drafted = await source.draft();
+      const saved = await keepPosting(drafted, drafted.questions);
+      if (!panel.isConnected) return;
+      state.jd = saved.id;
+      state.asked = [];
+      history.pushState(null, "", `#/practice/jd/${encodeURIComponent(saved.id)}`);
+      await startQuestion();
+    } catch (err) {
+      if (!panel.isConnected) return;
+      status.textContent = "";
+      go.disabled = false;
+      fail(err.message);
+    }
   };
 }
 
