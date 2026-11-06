@@ -28,7 +28,7 @@ class TestReadSource:
     def test_unsupported_format_is_rejected_by_name(self, tmp_path):
         path = tmp_path / "cv.docx"
         path.write_bytes(b"PK\x03\x04")
-        with pytest.raises(ValueError, match="Unsupported CV format"):
+        with pytest.raises(ValueError, match="Unsupported file format"):
             read_source(path)
 
 

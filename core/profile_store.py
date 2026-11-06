@@ -89,25 +89,28 @@ def needs_ingest(directory: Path | None = None) -> bool:
 
 
 
+def split_frontmatter(text: str) -> tuple[dict, str]:
+    """Separate a Markdown file's YAML frontmatter from its body.
+
+    Line endings are normalised and a BOM stripped first, so a file saved by a
+    Windows editor parses the same as one saved by vim. .gitattributes keeps
+    checkouts on LF; this covers everything else.
+    """
+    text = text.lstrip("﻿").replace("\r\n", "\n")
+    match = _FRONTMATTER.match(text)
+    if not match:
+        raise ValueError("file has no YAML frontmatter block")
+    return yaml.safe_load(match.group(1)) or {}, match.group(2)
+
+
 def parse_story(text: str) -> Story:
     """Parse one `stories/<id>.md` file.
-
-    Line endings are normalised and a BOM stripped first, so a story saved by a
-    Windows editor parses to the same Story as one saved by vim. .gitattributes
-    keeps checkouts on LF; this covers everything else.
 
     Any `## ` heading closes the section in progress, and an unrecognised one
     then collects nothing - otherwise a note added under your own heading would
     be silently absorbed into Reflection.
     """
-    text = text.lstrip("﻿").replace("\r\n", "\n")
-
-    match = _FRONTMATTER.match(text)
-    if not match:
-        raise ValueError("story file has no YAML frontmatter block")
-
-    meta = yaml.safe_load(match.group(1)) or {}
-    body = match.group(2)
+    meta, body = split_frontmatter(text)
 
     heading_to_field = {h.lower(): f for h, f in SECTIONS}
     sections: dict[str, str] = {}

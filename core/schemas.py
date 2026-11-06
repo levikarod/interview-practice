@@ -307,12 +307,47 @@ class Question(Strict):
         description="One line on why this question is worth asking this "
                     "candidate. Shown when reviewing, not during practice.",
     )
+    jd_id: str | None = Field(
+        default=None,
+        description="Leave null. Set by the app to the job description this "
+                    "question was kept from.",
+    )
 
 
 class GeneratedQuestions(Strict):
     """Questions drafted from a job description, for review before they are kept."""
 
+    title: str = brief(
+        60, default="",
+        description="The role and company as the posting names them, e.g. "
+                    "'Senior Backend Engineer, Acme'.",
+    )
     role_summary: str = Field(
         description="One line: what this role actually screens for.",
     )
     questions: list[Question] = Field(default_factory=list, max_length=12)
+
+
+class JobDescription(Strict):
+    """A posting you kept questions from.
+
+    Stored as `jds/<id>.md` in the profile: frontmatter for the fields below the
+    id, the posting's own text as the body. Its questions live in the question
+    bank like any other and point back here through `Question.jd_id`, so
+    practising one role is a filter on the bank rather than a second bank.
+    """
+
+    id: str
+    title: str = ""
+    role_summary: str = ""
+    created: str = ""
+    text: str = ""
+
+
+class NewJobDescription(Strict):
+    """What the browser sends back once you've chosen which drafts to keep."""
+
+    title: str = ""
+    role_summary: str = ""
+    text: str
+    questions: list[Question]

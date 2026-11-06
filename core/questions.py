@@ -150,13 +150,21 @@ def slug(text: str, taken: set[str] | None = None) -> str:
 
 
 def pick_question(directory: Path | None = None, exclude: set[str] | None = None,
-                  rng: random.Random | None = None) -> Question | None:
+                  rng: random.Random | None = None,
+                  jd_id: str | None = None) -> Question | None:
     """A question to ask next, avoiding ones already asked this session.
 
     Falls back to the full bank once every question has been used, so a long
     session keeps working instead of running dry.
+
+    With `jd_id`, the bank is narrowed to that job description's questions
+    before anything else, so the fallback restarts inside the role too. Letting
+    it reach the whole bank would quietly slip other roles' questions into a
+    session the candidate scoped to one.
     """
     bank = load_questions(directory)
+    if jd_id is not None:
+        bank = [q for q in bank if q.jd_id == jd_id]
     if not bank:
         return None
     remaining = [q for q in bank if q.id not in (exclude or set())]

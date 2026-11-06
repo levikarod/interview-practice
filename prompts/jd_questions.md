@@ -92,7 +92,13 @@ must stay open, so put "his CV claims 82.8% here" in the note, not in the text.
 
 **id** — kebab-case, short, derived from the question.
 
+**title** — the role and the company as the posting names them, such as
+"Senior Backend Engineer, Acme". The candidate picks from these when choosing
+what to practise for, so keep it short enough for a menu. Leave the company out
+if the posting doesn't name one.
+
 **role_summary** — one line naming what this role actually screens for, as
 opposed to what the job description says it wants.
 
-Set `source` to "jd" and `enabled` to true on every question.
+Set `source` to "jd" and `enabled` to true on every question, and leave `jd_id`
+null.

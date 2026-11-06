@@ -13,13 +13,20 @@ const TEMPLATE = `
 
   <section class="group">
     <h2>From a job description</h2>
-    <p class="muted small">Questions are drafted where the role's requirements overlap your own material, plus a couple aimed at gaps worth rehearsing honestly. Nothing is saved until you pick.</p>
+    <p class="muted small">Questions are drafted where the role's requirements overlap your own material, plus a couple aimed at gaps worth rehearsing honestly. Nothing is saved until you pick, and the ones you keep stay together so you can practise just that role.</p>
+    <div class="actions jd-source">
+      <button id="jd-choose">Upload the posting</button>
+      <span class="muted small" id="jd-file">PDF, Markdown or text, or paste it below.</span>
+      <button id="jd-clear" hidden>Use pasted text instead</button>
+      <input type="file" id="jd-upload" accept=".pdf,.md,.txt" hidden>
+    </div>
     <textarea id="jd" rows="7" placeholder="Paste the full posting. Responsibilities and requirements are where the questions come from."></textarea>
     <div class="actions">
       <button id="generate" class="primary">Draft questions</button>
       <span class="muted small" id="jd-status"></span>
     </div>
     <div id="drafted" hidden>
+      <label class="jd-title">Name this set<input id="jd-title" type="text" maxlength="80"></label>
       <p class="role-summary" id="role-summary"></p>
       <div class="actions">
         <button id="select-all">Select all</button>
@@ -34,6 +41,8 @@ const TEMPLATE = `
   <section class="group">
     <h2>Your bank</h2>
     <div class="actions">
+      <select id="jd-filter" aria-label="Which questions"><option value="">All questions</option></select>
+      <button id="jd-practise" class="primary" hidden>Practise these</button>
       <input id="filter" type="search" placeholder="Filter by text or tag">
       <label class="toggle"><input type="checkbox" id="show-disabled"> show turned off</label>
       <button id="add-new">Add your own</button>
@@ -71,7 +80,7 @@ const TEMPLATE = `
 
 export async function mount(el) {
   root = el;
-  state = { bank: [], drafts: [], editing: null };
+  state = { bank: [], jds: [], drafts: [], posting: null, editing: null };
   root.innerHTML = TEMPLATE;
   bind();
   try {
@@ -88,18 +97,34 @@ function toQuestion(row) {
 
 const tagList = (tags) => (tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("");
 
-async function loadBank() {
-  state.bank = await api(`/api/questions?include_disabled=${$("#show-disabled").checked}`);
+const jdTitle = (id) => {
+  const posting = state.jds.find((j) => j.id === id);
+  return posting ? posting.title || posting.id : id;
+};
+
+async function loadBank(select) {
+  [state.bank, state.jds] = await Promise.all([
+    api(`/api/questions?include_disabled=${$("#show-disabled").checked}`),
+    api("/api/jds"),
+  ]);
+  const picker = $("#jd-filter");
+  const keep = select ?? picker.value;
+  picker.innerHTML = `<option value="">All questions</option>` + state.jds.map((j) =>
+    `<option value="${esc(j.id)}">${esc(j.title || j.id)} (${j.questions})</option>`).join("");
+  picker.value = state.jds.some((j) => j.id === keep) ? keep : "";
   renderBank();
 }
 
 function renderBank() {
   const needle = $("#filter").value.trim().toLowerCase();
+  const posting = $("#jd-filter").value;
   const rows = state.bank.filter((q) =>
-    !needle ||
-    q.text.toLowerCase().includes(needle) ||
-    (q.tags || []).some((t) => t.toLowerCase().includes(needle)));
+    (!posting || q.jd_id === posting) && (
+      !needle ||
+      q.text.toLowerCase().includes(needle) ||
+      (q.tags || []).some((t) => t.toLowerCase().includes(needle))));
 
+  show("#jd-practise", Boolean(posting));
   $("#bank-count").textContent = `${rows.length} of ${state.bank.length} shown`;
   $("#qlist").innerHTML = rows.map((q) => `
     <li class="qrow ${q.enabled ? "" : "off"}" data-id="${esc(q.id)}">
@@ -108,6 +133,7 @@ function renderBank() {
         <p class="qmeta">
           <span class="badge ${esc(q.source)}">${esc(q.source)}</span>
           <span class="muted small">${esc(q.kind)}, ${q.seconds}s</span>
+          ${q.jd_id ? `<span class="target">for ${esc(jdTitle(q.jd_id))}</span>` : ""}
           ${tagList(q.tags)}
         </p>
         ${q.note ? `<p class="qnote">${esc(q.note)}</p>` : ""}
@@ -201,14 +227,29 @@ function bind() {
     }
   });
 
+  const chooseFile = (file) => {
+    $("#jd-file").textContent = file ? file.name : "PDF, Markdown or text, or paste it below.";
+    $("#jd").disabled = Boolean(file);
+    show("#jd-clear", Boolean(file));
+  };
+  $("#jd-choose").onclick = () => $("#jd-upload").click();
+  $("#jd-upload").onchange = () => chooseFile($("#jd-upload").files[0]);
+  $("#jd-clear").onclick = () => { $("#jd-upload").value = ""; chooseFile(null); };
+
   $("#generate").onclick = async () => {
     show("#jd-error", false);
     show("#drafted", false);
     $("#generate").disabled = true;
     $("#jd-status").textContent = "Reading the posting against your material…";
+    const body = new FormData();
+    const file = $("#jd-upload").files[0];
+    if (file) body.append("file", file);
+    else body.append("text", $("#jd").value.trim());
     try {
-      const result = await api("/api/jd/generate", json("POST", { text: $("#jd").value.trim() }));
+      const result = await api("/api/jd/generate", { method: "POST", body });
       state.drafts = result.questions;
+      state.posting = { text: result.text, role_summary: result.role_summary };
+      $("#jd-title").value = result.title;
       $("#role-summary").textContent = result.role_summary;
       $("#jd-status").textContent = `${result.questions.length} drafted, $${result.cost_usd}`;
       renderDrafts();
@@ -231,19 +272,31 @@ function bind() {
       $("#jd-status").textContent = "Nothing selected.";
       return;
     }
+    let saved;
     try {
-      await api("/api/questions/bulk", json("POST", chosen));
+      saved = await api("/api/jds", json("POST", {
+        title: $("#jd-title").value.trim(),
+        role_summary: state.posting.role_summary,
+        text: state.posting.text,
+        questions: chosen,
+      }));
     } catch (err) {
       $("#jd-error").textContent = err.message;
       return show("#jd-error", true);
     }
-    $("#jd-status").textContent = `Added ${chosen.length} to your bank.`;
+    $("#jd-status").innerHTML = `Kept ${saved.added} for ${esc(saved.title || "this posting")}. <a href="#/practice/jd/${encodeURIComponent(saved.id)}">Practise them now</a>`;
     show("#drafted", false);
     $("#jd").value = "";
-    loadBank();
+    $("#jd-upload").value = "";
+    chooseFile(null);
+    loadBank(saved.id);
   };
 
+  $("#jd-filter").onchange = renderBank;
+  $("#jd-practise").onclick = () => {
+    location.hash = `#/practice/jd/${encodeURIComponent($("#jd-filter").value)}`;
+  };
   $("#filter").oninput = renderBank;
-  $("#show-disabled").onchange = loadBank;
+  $("#show-disabled").onchange = () => loadBank();
   $("#add-new").onclick = () => openEditor(null);
 }

@@ -11,10 +11,11 @@ import asyncio
 import json
 import tempfile
 import uuid
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
-from fastapi import Body, FastAPI, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
@@ -23,7 +24,7 @@ from pypdf.errors import PyPdfError
 
 from core import (db, ingest, jd, llm, patches, profile_store, questions, runs,
                   transcribe)
-from core.schemas import Question, Story, StoryPatch, StoryStatus
+from core.schemas import NewJobDescription, Question, Story, StoryPatch, StoryStatus
 from core.profile_store import ProfileNotSetUp
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -296,14 +297,6 @@ def add_question(question: Question) -> dict:
     return questions.upsert(question.model_copy(update={"source": "custom"})).model_dump()
 
 
-@app.post("/api/questions/bulk")
-def add_questions(payload: list[Question] = Body(...)) -> dict:
-    """Accept a batch, which is how generated questions are kept."""
-    _writable_dir()
-    saved = questions.upsert_many(payload)
-    return {"saved": [q.model_dump() for q in saved]}
-
-
 @app.delete("/api/questions/{question_id}")
 def remove_question(question_id: str) -> dict:
     _writable_dir()
@@ -312,26 +305,73 @@ def remove_question(question_id: str) -> dict:
     return {"deleted": question_id}
 
 
+def _text_of(upload: UploadFile) -> str:
+    """Plain text out of an uploaded PDF, Markdown or text file."""
+    suffix = Path(upload.filename or "upload.txt").suffix.lower()
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / f"upload{suffix}"
+        source.write_bytes(upload.file.read())
+        try:
+            return ingest.read_source(source)
+        except (ValueError, PyPdfError) as exc:
+            raise HTTPException(400, f"Couldn't read that file: {exc}") from exc
+
+
 @app.post("/api/jd/generate")
-def generate_from_jd(payload: dict = Body(...)) -> dict:
-    """Draft questions from a job description. Nothing is saved."""
+def generate_from_jd(text: str = Form(""),
+                     file: UploadFile | None = File(None)) -> dict:
+    """Draft questions from a job description, uploaded or pasted. Nothing is saved.
+
+    The posting's text comes back with the drafts, so the browser can return it
+    when you choose what to keep and the server holds nothing in between.
+    """
+    if file is not None:
+        text = _text_of(file)
     try:
-        drafted, completion = jd.generate(payload.get("text", ""))
+        drafted, completion = jd.generate(text)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
     return {
+        "title": drafted.title,
         "role_summary": drafted.role_summary,
+        "text": text,
         "questions": [q.model_dump() for q in drafted.questions],
         "cost_usd": round(completion.cost_usd, 4),
     }
 
 
+@app.get("/api/jds")
+def list_jds() -> list[dict]:
+    """Kept postings, each with how many of its questions are switched on."""
+    try:
+        postings = jd.load_all()
+    except ProfileNotSetUp:
+        return []
+    counts = Counter(q.jd_id for q in questions.load_questions() if q.jd_id)
+    return [{"id": p.id, "title": p.title, "role_summary": p.role_summary,
+             "created": p.created, "questions": counts[p.id]} for p in postings]
+
+
+@app.post("/api/jds")
+def save_jd(posting: NewJobDescription) -> dict:
+    """Keep a posting and the questions you chose from it."""
+    directory = _writable_dir()
+    if not posting.questions:
+        raise HTTPException(400, "Pick at least one question to keep.")
+    saved = jd.save(posting.title, posting.text, posting.questions,
+                    posting.role_summary, directory)
+    return {"id": saved.id, "title": saved.title, "added": len(posting.questions)}
+
+
 @app.get("/api/questions/next")
-def next_question(exclude: str = "") -> dict:
-    """A question to ask, avoiding ids listed in `exclude` (comma separated)."""
+def next_question(exclude: str = "", jd_id: str = Query("", alias="jd")) -> dict:
+    """A question to ask, avoiding ids listed in `exclude` (comma separated).
+
+    `jd` narrows it to one job description's questions.
+    """
     asked = {qid for qid in exclude.split(",") if qid}
-    question = questions.pick_question(exclude=asked)
+    question = questions.pick_question(exclude=asked, jd_id=jd_id or None)
     if question is None:
         raise HTTPException(404, "No questions available.")
     return question.model_dump()

@@ -12,9 +12,9 @@ let root;
 let state;
 const $ = (sel) => root.querySelector(sel);
 
-export async function mount(el) {
+export async function mount(el, params = []) {
   root = el;
-  state = { asked: [], question: null, recorder: null, stream: null, chunks: [], ticker: null, stopTimer: null, source: null };
+  state = { asked: [], question: null, recorder: null, stream: null, chunks: [], ticker: null, stopTimer: null, source: null, jd: params[0] === "jd" ? params[1] : null };
   document.addEventListener("keydown", onKey);
   await renderHome();
 }
@@ -63,18 +63,27 @@ function statusLine(p) {
 
 async function renderHome() {
   document.body.classList.remove("focus");
-  const [profile, history, bank] = await Promise.all([
-    api("/api/profile"), api("/api/history?limit=1"), api("/api/questions"),
+  const [profile, history, bank, jds] = await Promise.all([
+    api("/api/profile"), api("/api/history?limit=1"), api("/api/questions"), api("/api/jds"),
   ]);
   const last = history.runs[0];
   const lastQuestion = last && bank.find((q) => q.id === last.question_id);
   const s = profile.stories || { total: 0, draft: 0, verified: 0 };
+  const scoped = jds.find((j) => j.id === state.jd);
 
   root.innerHTML = `
   <section class="home">
     ${statusLine(profile)}
     <h1 class="page-title">Practice</h1>
     <p class="lede">You get one question and a countdown. Answer out loud; the feedback checks what you said against your own stories.</p>
+    ${jds.length ? `
+    <label class="scope">Questions from
+      <select data-act="scope">
+        <option value="">every job description and the shipped bank</option>
+        ${jds.map((j) => `<option value="${esc(j.id)}" ${j.id === state.jd ? "selected" : ""}>${esc(j.title || j.id)} (${j.questions})</option>`).join("")}
+      </select>
+    </label>
+    ${scoped?.role_summary ? `<p class="muted small">${esc(scoped.role_summary)}</p>` : ""}` : ""}
     <button class="primary big" data-act="start">Start a question</button>
     <dl class="tally">
       <div><dt>Answers given</dt><dd>${history.totals.runs}</dd></div>
@@ -92,14 +101,25 @@ async function renderHome() {
 
   $("[data-act=start]").onclick = () => startQuestion();
   $("[data-act=retry-last]")?.addEventListener("click", () => startQuestion(lastQuestion));
+  const scope = $("[data-act=scope]");
+  if (scope) scope.onchange = () => {
+    location.hash = scope.value ? `#/practice/jd/${encodeURIComponent(scope.value)}` : "#/practice";
+  };
+}
+
+function nextUrl(exclude) {
+  const params = new URLSearchParams();
+  if (exclude.length) params.set("exclude", exclude.join(","));
+  if (state.jd) params.set("jd", state.jd);
+  return `/api/questions/next?${params}`;
 }
 
 async function nextQuestion() {
   try {
-    return await api(`/api/questions/next?exclude=${encodeURIComponent(state.asked.join(","))}`);
+    return await api(nextUrl(state.asked));
   } catch {
     state.asked = [];
-    return api("/api/questions/next");
+    return api(nextUrl([]));
   }
 }
 

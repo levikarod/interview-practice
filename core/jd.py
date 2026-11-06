@@ -7,7 +7,12 @@ the overlap between what the role probes and what the candidate can speak to.
 Generated questions are returned, never saved. Reviewing them is the point: the
 model will write some that miss, and a bank silently filling with mediocre
 questions is worse than one that stays small. Saving is a separate, explicit
-step.
+step, and it keeps the posting too.
+
+A kept posting is `jds/<id>.md` in the profile, readable on its own. Its
+questions go into the ordinary bank carrying `jd_id`, so practising for one role
+is a filter on the bank rather than a second bank with its own edit and remove
+rules to keep in step.
 
 The candidate summary deliberately carries story ids, tags and aliases rather
 than full STAR text. The questions' `tags` are what later retrieval matches
@@ -17,11 +22,14 @@ and full bodies would cost tokens without improving the tags.
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
+
+import yaml
 
 from core import llm, profile_store, questions as questions_mod
 from core.llm import Completion, LLMClient
-from core.schemas import GeneratedQuestions, Question
+from core.schemas import GeneratedQuestions, JobDescription, Question
 
 PROMPT = Path(__file__).resolve().parent.parent / "prompts" / "jd_questions.md"
 
@@ -113,3 +121,56 @@ def _deduplicate(drafted: GeneratedQuestions,
         taken.add(question.id)
         fixed.append(question.model_copy(update={"source": "jd"}))
     return drafted.model_copy(update={"questions": fixed})
+
+
+META_KEYS = ["id", "title", "role_summary", "created"]
+
+
+def jds_dir(directory: Path | None = None) -> Path:
+    return (directory or profile_store.profile_dir()) / "jds"
+
+
+def save(title: str, text: str, chosen: list[Question], role_summary: str = "",
+         directory: Path | None = None, today: date | None = None) -> JobDescription:
+    """Keep a posting and the questions chosen from it.
+
+    The id is derived from the title rather than taken from the request, so
+    nothing a browser sends can name a path outside `jds/`.
+    """
+    folder = jds_dir(directory)
+    taken = {path.stem for path in folder.glob("*.md")} if folder.exists() else set()
+    posting = JobDescription(
+        id=questions_mod.slug(title or "job description", taken),
+        title=title.strip(),
+        role_summary=role_summary.strip(),
+        created=(today or date.today()).isoformat(),
+        text=text.strip(),
+    )
+
+    folder.mkdir(parents=True, exist_ok=True)
+    meta = {key: getattr(posting, key) for key in META_KEYS}
+    front = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True,
+                           default_flow_style=False).strip()
+    (folder / f"{posting.id}.md").write_text(f"---\n{front}\n---\n\n{posting.text}\n",
+                                             encoding="utf-8")
+
+    questions_mod.upsert_many(
+        [q.model_copy(update={"jd_id": posting.id, "source": "jd"}) for q in chosen],
+        directory,
+    )
+    return posting
+
+
+def load_all(directory: Path | None = None) -> list[JobDescription]:
+    """Every kept posting, sorted by id. A malformed file is skipped, not raised."""
+    folder = jds_dir(directory)
+    if not folder.exists():
+        return []
+    out: list[JobDescription] = []
+    for path in sorted(folder.glob("*.md")):
+        try:
+            meta, body = profile_store.split_frontmatter(path.read_text(encoding="utf-8"))
+            out.append(JobDescription(**meta, text=body.strip()))
+        except (ValueError, TypeError) as exc:
+            print(f"[jd] skipping {path.name}: {exc}")
+    return out

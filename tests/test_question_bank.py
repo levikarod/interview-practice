@@ -6,6 +6,8 @@ does, so several of these assert on its contents staying put.
 
 from __future__ import annotations
 
+import random
+
 import pytest
 
 from core import jd, questions as Q
@@ -235,3 +237,92 @@ class TestStaleEntriesDoNotBreakTheBank:
         """The whole point: one bad row must not hide the shipped questions."""
         self._bank_with_a_stale_row(bank)
         assert len(Q.load_questions(bank)) >= 20
+
+
+POSTING = "Own our Celery worker fleet and keep retries safe. " * 5
+
+
+class TestSavingAJobDescription:
+    """A posting you drafted questions from is kept, so its questions can be
+    practised as a set and you can still see what they were drafted against."""
+
+    @staticmethod
+    def _save(directory, title="Backend Engineer, Acme", chosen=None):
+        chosen = chosen or [Question(id="q1", text="How do you retry safely?")]
+        return jd.save(title, POSTING, chosen, "Screens for queue ownership",
+                       directory)
+
+    def test_the_posting_is_kept_as_a_file_you_can_read(self, bank):
+        saved = self._save(bank)
+        path = bank / "jds" / f"{saved.id}.md"
+        assert "Own our Celery worker fleet" in path.read_text(encoding="utf-8")
+
+    def test_it_round_trips(self, bank):
+        saved = self._save(bank)
+        [loaded] = jd.load_all(bank)
+        assert loaded.id == saved.id
+        assert loaded.title == "Backend Engineer, Acme"
+        assert loaded.role_summary == "Screens for queue ownership"
+        assert loaded.text.strip() == POSTING.strip()
+        assert loaded.created
+
+    def test_its_questions_point_back_at_it(self, bank):
+        saved = self._save(bank)
+        question = Q.get_question("q1", bank)
+        assert question.jd_id == saved.id
+        assert question.source == "jd"
+
+    def test_the_id_comes_from_the_title_and_never_collides(self, bank):
+        first = self._save(bank)
+        second = self._save(bank, chosen=[Question(id="q2", text="Other?")])
+        assert first.id == "backend-engineer-acme"
+        assert second.id != first.id
+
+    def test_an_untitled_posting_still_gets_a_readable_id(self, bank):
+        assert self._save(bank, title="").id == "job-description"
+
+    def test_nothing_reaches_the_committed_bank(self, bank):
+        self._save(bank)
+        assert Q.CORE_BANK.read_text(encoding="utf-8") == CORE_TEXT
+
+    def test_the_model_is_asked_for_a_short_title(self):
+        """The title is what you choose from when picking what to practise for,
+        so it has to fit in a menu."""
+        props = GeneratedQuestions.model_json_schema()["properties"]
+        assert props["title"]["maxLength"] == 60
+
+
+class TestPractisingOneJobDescription:
+    """Practising for one role means only that role's questions come up."""
+
+    @staticmethod
+    def _two_postings(directory):
+        acme = jd.save("Acme", POSTING, [Question(id="a1", text="A1?"),
+                                         Question(id="a2", text="A2?")],
+                       "", directory)
+        jd.save("Other", POSTING, [Question(id="o1", text="O1?")], "", directory)
+        return acme
+
+    def test_only_that_postings_questions_are_asked(self, bank):
+        acme = self._two_postings(bank)
+        rng = random.Random(0)
+        asked = {Q.pick_question(bank, jd_id=acme.id, rng=rng).id for _ in range(30)}
+        assert asked == {"a1", "a2"}
+
+    def test_running_out_starts_again_inside_the_same_posting(self, bank):
+        """Falling back to the whole bank would quietly slip other roles'
+        questions into a session scoped to this one."""
+        acme = self._two_postings(bank)
+        picked = Q.pick_question(bank, exclude={"a1", "a2"}, jd_id=acme.id)
+        assert picked.id in {"a1", "a2"}
+
+    def test_a_turned_off_question_is_never_asked(self, bank):
+        acme = self._two_postings(bank)
+        a1 = Q.get_question("a1", bank)
+        Q.upsert(a1.model_copy(update={"enabled": False}), bank)
+        rng = random.Random(0)
+        asked = {Q.pick_question(bank, jd_id=acme.id, rng=rng).id for _ in range(20)}
+        assert asked == {"a2"}
+
+    def test_an_unknown_posting_has_nothing_to_ask(self, bank):
+        assert Q.pick_question(bank, jd_id="no-such-posting") is None

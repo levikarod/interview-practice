@@ -244,7 +244,7 @@ def _title_from(text: str, words: int = 6) -> str:
 
 
 def read_source(path: Path) -> str:
-    """Pull plain text out of a CV file. PDF, Markdown or plain text.
+    """Pull plain text out of a CV or job description. PDF, Markdown or plain text.
 
     We never parse the PDF structurally - no column detection, no heading
     heuristics. Text goes to the model, which normalises it into our Markdown
@@ -266,7 +266,7 @@ def read_source(path: Path) -> str:
                 "the text in instead."
             )
         return text
-    raise ValueError(f"Unsupported CV format {suffix!r}. Use .pdf, .md or .txt.")
+    raise ValueError(f"Unsupported file format {suffix!r}. Use .pdf, .md or .txt.")
 
 
 def extract_cv_markdown(text: str, client: "LLMClient | None" = None) -> str:

@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 import main
 from core import db, profile_store
+from core.schemas import GeneratedQuestions, Question
 
 SAMPLE_CV = (profile_store.EXAMPLE_DIR / "cv.md").read_text(encoding="utf-8")
 
@@ -206,7 +207,6 @@ class TestReviewFixes:
         question.pop("is_core")
         assert client.put(f"/api/questions/{question['id']}", json=question).status_code == 409
         assert client.delete(f"/api/questions/{question['id']}").status_code == 409
-        assert client.post("/api/questions/bulk", json=[question]).status_code == 409
         assert not (profile_store.EXAMPLE_DIR / "questions.yaml").exists()
 
     def test_sample_additions_do_not_show_on_your_profile(self, own_profile, record_run):
@@ -230,3 +230,68 @@ class TestReviewFixes:
         response = upload(client, "cv.txt", b"Ana Ruiz, backend engineer.")
         assert response.status_code == 502
         assert "Not logged in" in response.json()["detail"]
+
+
+JD_TEXT = "Own our Celery worker fleet and keep retries safe. " * 5
+
+
+def drafted(*questions, title="Backend Engineer, Acme"):
+    return GeneratedQuestions(title=title, role_summary="Queue ownership",
+                              questions=list(questions)).model_dump()
+
+
+def save_posting(client, questions=None):
+    questions = [{"id": "q1", "text": "How do you retry safely?"}] if questions is None else questions
+    return client.post("/api/jds", json={
+        "title": "Backend Engineer, Acme", "role_summary": "Queue ownership",
+        "text": JD_TEXT, "questions": questions})
+
+
+class TestJobDescriptions:
+    def test_an_uploaded_posting_is_read_and_sent_to_the_model(self, own_profile,
+                                                               fake_llm):
+        model = fake_llm(data=drafted(Question(id="q1", text="How do you retry?")))
+        response = own_profile.post(
+            "/api/jd/generate", files={"file": ("acme.md", JD_TEXT.encode())})
+
+        assert response.status_code == 200
+        assert "Celery worker fleet" in model.calls[0]["payload"]
+        body = response.json()
+        assert body["title"] == "Backend Engineer, Acme"
+        assert "Celery worker fleet" in body["text"]
+
+    def test_pasted_text_still_works(self, own_profile, fake_llm):
+        fake_llm(data=drafted())
+        assert own_profile.post("/api/jd/generate",
+                                data={"text": JD_TEXT}).status_code == 200
+
+    def test_an_unreadable_file_is_400(self, own_profile):
+        response = own_profile.post(
+            "/api/jd/generate", files={"file": ("acme.docx", b"PK")})
+        assert response.status_code == 400
+
+    def test_saving_keeps_the_posting_with_its_chosen_questions(self, own_profile):
+        saved = save_posting(own_profile)
+        assert saved.status_code == 200
+
+        [listed] = own_profile.get("/api/jds").json()
+        assert listed["id"] == saved.json()["id"]
+        assert listed["title"] == "Backend Engineer, Acme"
+        assert listed["questions"] == 1
+
+    def test_practising_one_posting_asks_only_its_questions(self, own_profile):
+        jd_id = save_posting(own_profile).json()["id"]
+        picked = own_profile.get(f"/api/questions/next?jd={jd_id}").json()
+        assert picked["id"] == "q1"
+        assert picked["jd_id"] == jd_id
+
+    def test_an_unknown_posting_has_nothing_to_ask(self, own_profile):
+        assert own_profile.get("/api/questions/next?jd=nope").status_code == 404
+
+    def test_saving_with_nothing_chosen_is_400(self, own_profile):
+        assert save_posting(own_profile, questions=[]).status_code == 400
+
+    def test_the_sample_profile_cannot_save_one(self, client):
+        """Like every other write, it would land in profile.example/."""
+        assert save_posting(client).status_code == 409
+        assert not (profile_store.EXAMPLE_DIR / "jds").exists()

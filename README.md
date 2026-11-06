@@ -102,8 +102,9 @@ command line: `uv run python -m core.ingest ~/path/to/cv.pdf`.
   computed as arithmetic rather than a model's opinion.
 - **Turns a CV bullet into a story you can tell.** Each answer fills in the
   detail behind a claim you're already making.
-- **Rehearses the questions that role will actually ask.** Paste a job
-  description; it drafts questions where its requirements meet your material.
+- **Rehearses the questions that role will actually ask.** Upload or paste a
+  job description; it drafts questions where its requirements meet your
+  material, and you can practise just that role's set.
 
 ## What it will not do
 
@@ -158,6 +159,7 @@ material doesn't have to be.
 | `stories/*.md` | One story per CV bullet, `stub → draft → verified` |
 | `guardrails.md` | Claims you can't defend and figures that are stale. Edited in **Profile** |
 | `questions.yaml` | Your questions, overriding the shipped bank by id |
+| `jds/*.md` | Job descriptions you kept questions from, one posting per file |
 
 A story starts as a **stub** — it knows what you *claim*, but not the story
 behind it. That's already enough for feedback to say *"your CV claims 20+
@@ -192,7 +194,14 @@ story you've filled in, and refuses to clobber an existing `cv.md` without
 ## Questions
 
 The **Questions** section browses the bank, edits any question, and drafts new
-ones from a job description.
+ones from a job description — uploaded as a PDF, Markdown or text file, or
+pasted.
+
+**One set per role.** The questions you keep from a posting stay together under
+the role's name. Filter the bank to that set to work on it, then **Practise
+these** — or pick the role from **Questions from** on the Practice page. Every
+question in that session comes from that set, including after you've been
+through them all and it starts over.
 
 **Two layers.** `questions/core.yaml` is committed and works for anyone. Yours
 live in gitignored `profile/questions.yaml` and win on id collision — so editing
@@ -210,7 +219,8 @@ rehearsing against it teaches nothing. The specificity moves to the tags and the
 note, which you don't see while answering.
 
 Nothing is saved until you pick. A bank that fills itself is worse than one that
-stays small.
+stays small. When you do pick, the posting is kept beside its questions, so you
+can still see what they were drafted against.
 
 ---
 
@@ -316,7 +326,7 @@ All optional; every one has a working default.
 ## Development
 
 ```bash
-uv run pytest                    # 188 tests, none make a model call
+uv run pytest                    # 207 tests, none make a model call
 uv run uvicorn main:app --reload
 ```
 
@@ -329,7 +339,7 @@ core/
   ingest.py         CV → profile → story stubs
   retrieve.py       tag/alias overlap
   analyze.py        the one model call
-  jd.py             questions from a job description
+  jd.py             job descriptions: draft questions, keep the posting
   runs.py           per-run asyncio.Queue, drained by SSE
   patches.py        merge a reviewed story addition into a story
   db.py             sqlite
