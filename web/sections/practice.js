@@ -31,10 +31,23 @@ function setReadAloud(on) {
   }
 }
 
+const SPEECH_LANG = "en-US";
+
+function englishVoice() {
+  const voices = speechSynthesis.getVoices();
+  return voices.find((v) => v.lang === SPEECH_LANG && v.localService)
+    || voices.find((v) => v.lang === SPEECH_LANG)
+    || voices.find((v) => v.lang.startsWith("en"));
+}
+
 function speak(text) {
   if (!canSpeak) return;
   speechSynthesis.cancel();
-  speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = SPEECH_LANG;
+  const voice = englishVoice();
+  if (voice) utterance.voice = voice;
+  speechSynthesis.speak(utterance);
 }
 
 const hush = () => canSpeak && speechSynthesis.cancel();
