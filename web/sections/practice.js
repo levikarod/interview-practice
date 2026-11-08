@@ -8,6 +8,36 @@ const STAGES = [
   ["done", "Done"],
 ];
 const STAR = ["situation", "task", "action", "result", "reflection"];
+const READ_ALOUD = "read-aloud";
+const canSpeak = "speechSynthesis" in window;
+
+function storedReadAloud() {
+  try {
+    return localStorage.getItem(READ_ALOUD) === "on";
+  } catch {
+    return false;
+  }
+}
+
+let readAloud = storedReadAloud();
+const readAloudOn = () => canSpeak && readAloud;
+
+function setReadAloud(on) {
+  readAloud = on;
+  try {
+    localStorage.setItem(READ_ALOUD, on ? "on" : "off");
+  } catch {
+    return;
+  }
+}
+
+function speak(text) {
+  if (!canSpeak) return;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+}
+
+const hush = () => canSpeak && speechSynthesis.cancel();
 
 let root;
 let state;
@@ -27,6 +57,7 @@ export function unmount() {
 }
 
 function teardown() {
+  hush();
   clearInterval(state.ticker);
   clearTimeout(state.stopTimer);
   if (state.recorder && state.recorder.state !== "inactive") {
@@ -87,6 +118,7 @@ async function renderHome() {
     </label>
     ${scoped?.role_summary ? `<p class="muted small">${esc(scoped.role_summary)}</p>` : ""}` : ""}
     <button class="primary big" data-act="start">Start a question</button>
+    ${canSpeak ? `<label class="toggle read-aloud"><input type="checkbox" data-act="read-aloud" ${readAloudOn() ? "checked" : ""}> Read each question aloud</label>` : ""}
     ${canDraft ? `
     <details class="for-job">
       <summary>Practise for a job</summary>
@@ -113,6 +145,8 @@ async function renderHome() {
 
   $("[data-act=start]").onclick = () => startQuestion();
   $("[data-act=retry-last]")?.addEventListener("click", () => startQuestion(lastQuestion));
+  const aloud = $("[data-act=read-aloud]");
+  if (aloud) aloud.onchange = () => setReadAloud(aloud.checked);
   const scope = $("[data-act=scope]");
   if (scope) scope.onchange = () => {
     location.hash = scope.value ? `#/practice/jd/${encodeURIComponent(scope.value)}` : "#/practice";
@@ -187,6 +221,7 @@ async function startQuestion(question) {
     <div class="focus-controls">
       <button class="primary big" data-act="record">Record answer</button>
       <button data-act="skip">Different question</button>
+      ${canSpeak ? `<button data-act="hear">Read it aloud</button>` : ""}
       <span class="hint">Esc to leave</span>
     </div>
     <p class="error" hidden></p>
@@ -197,10 +232,13 @@ async function startQuestion(question) {
     state.asked.push(question.id);
     startQuestion();
   };
+  $("[data-act=hear]")?.addEventListener("click", () => speak(question.text));
   $("[data-act=record]").focus();
+  if (readAloudOn()) speak(question.text);
 }
 
 async function startRecording() {
+  hush();
   try {
     state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (err) {
@@ -221,6 +259,7 @@ async function startRecording() {
   button.textContent = "Stop";
   button.onclick = stopRecording;
   $("[data-act=skip]").hidden = true;
+  if ($("[data-act=hear]")) $("[data-act=hear]").hidden = true;
 
   const tick = () => {
     const left = Math.max(0, (deadline - Date.now()) / 1000);
