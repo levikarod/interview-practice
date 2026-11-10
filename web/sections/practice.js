@@ -9,26 +9,34 @@ const STAGES = [
 ];
 const STAR = ["situation", "task", "action", "result", "reflection"];
 const READ_ALOUD = "read-aloud";
+const AUTO_START = "auto-start";
 const canSpeak = "speechSynthesis" in window;
+const prefs = {};
 
-function storedReadAloud() {
-  try {
-    return localStorage.getItem(READ_ALOUD) === "on";
-  } catch {
-    return false;
+function pref(key) {
+  if (!(key in prefs)) {
+    try {
+      prefs[key] = localStorage.getItem(key) === "on";
+    } catch {
+      prefs[key] = false;
+    }
   }
+  return prefs[key];
 }
 
-let readAloud = storedReadAloud();
-const readAloudOn = () => canSpeak && readAloud;
-
-function setReadAloud(on) {
-  readAloud = on;
+function setPref(key, on) {
+  prefs[key] = on;
   try {
-    localStorage.setItem(READ_ALOUD, on ? "on" : "off");
+    localStorage.setItem(key, on ? "on" : "off");
   } catch {
     return;
   }
+}
+
+const readAloudOn = () => canSpeak && pref(READ_ALOUD);
+
+function prefToggle(key, label) {
+  return `<label class="toggle"><input type="checkbox" data-pref="${key}" ${pref(key) ? "checked" : ""}> ${label}</label>`;
 }
 
 const SPEECH_LANG = "en-US";
@@ -40,17 +48,26 @@ function englishVoice() {
     || voices.find((v) => v.lang.startsWith("en"));
 }
 
-function speak(text) {
-  if (!canSpeak) return;
-  speechSynthesis.cancel();
+let speech = { turn: 0, utterance: null };
+
+function hush() {
+  speech = { turn: speech.turn + 1, utterance: null };
+  if (canSpeak) speechSynthesis.cancel();
+}
+
+function speak(text, then) {
+  hush();
+  const turn = speech.turn;
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = SPEECH_LANG;
   const voice = englishVoice();
   if (voice) utterance.voice = voice;
+  utterance.onend = utterance.onerror = () => {
+    if (then && speech.turn === turn) then();
+  };
+  speech.utterance = utterance;
   speechSynthesis.speak(utterance);
 }
-
-const hush = () => canSpeak && speechSynthesis.cancel();
 
 let root;
 let state;
@@ -131,7 +148,10 @@ async function renderHome() {
     </label>
     ${scoped?.role_summary ? `<p class="muted small">${esc(scoped.role_summary)}</p>` : ""}` : ""}
     <button class="primary big" data-act="start">Start a question</button>
-    ${canSpeak ? `<label class="toggle read-aloud"><input type="checkbox" data-act="read-aloud" ${readAloudOn() ? "checked" : ""}> Read each question aloud</label>` : ""}
+    <div class="prefs">
+      ${canSpeak ? prefToggle(READ_ALOUD, "Read each question aloud") : ""}
+      ${prefToggle(AUTO_START, "Start recording as soon as the question is shown, or once it's been read")}
+    </div>
     ${canDraft ? `
     <details class="for-job">
       <summary>Practise for a job</summary>
@@ -158,8 +178,9 @@ async function renderHome() {
 
   $("[data-act=start]").onclick = () => startQuestion();
   $("[data-act=retry-last]")?.addEventListener("click", () => startQuestion(lastQuestion));
-  const aloud = $("[data-act=read-aloud]");
-  if (aloud) aloud.onchange = () => setReadAloud(aloud.checked);
+  root.querySelectorAll("[data-pref]").forEach((box) => {
+    box.onchange = () => setPref(box.dataset.pref, box.checked);
+  });
   const scope = $("[data-act=scope]");
   if (scope) scope.onchange = () => {
     location.hash = scope.value ? `#/practice/jd/${encodeURIComponent(scope.value)}` : "#/practice";
@@ -209,7 +230,7 @@ async function nextQuestion() {
   }
 }
 
-async function startQuestion(question) {
+async function startQuestion(question, quiet = false) {
   teardown();
   try {
     question = question || await nextQuestion();
@@ -247,7 +268,10 @@ async function startQuestion(question) {
   };
   $("[data-act=hear]")?.addEventListener("click", () => speak(question.text));
   $("[data-act=record]").focus();
-  if (readAloudOn()) speak(question.text);
+  if (quiet) return;
+  const begin = () => { if (pref(AUTO_START)) startRecording(); };
+  if (readAloudOn()) speak(question.text, begin);
+  else begin();
 }
 
 async function startRecording() {
@@ -301,7 +325,7 @@ async function uploadAnswer() {
     const { run_id: runId } = await api("/api/answer", { method: "POST", body });
     watchRun(runId);
   } catch (err) {
-    await startQuestion(state.question);
+    await startQuestion(state.question, true);
     fail(`Upload failed: ${err.message}`);
   }
 }
@@ -334,7 +358,7 @@ function watchRun(runId) {
     source.close();
     state.source = null;
     if (run.stage === "done") return renderFeedback(run);
-    await startQuestion(state.question);
+    await startQuestion(state.question, true);
     fail(run.error || "Processing failed.");
   };
 

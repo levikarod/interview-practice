@@ -74,7 +74,9 @@ Open <http://localhost:8000>. The app starts on **Profile**.
 3. **Start practising.** **Start a question** clears the screen down to the
    question and the timer. Tick **Read each question aloud** to hear it the
    way an interviewer would ask it, through your browser's own voice, with no
-   extra cost. **Record answer** asks the browser for your
+   extra cost. Tick **Start recording as soon as the question is shown** and
+   the clock starts without a click, after the question is read if that's on.
+   **Record answer** asks the browser for your
    microphone. Your first answer downloads the speech model (~0.5 GB, a couple
    of minutes, once) — the Practice page says so before you start.
 

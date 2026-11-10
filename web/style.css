@@ -322,7 +322,7 @@ label.jd-title { display: grid; gap: 5px; margin-top: 18px; color: var(--muted);
 label.jd-title input { color: var(--ink); font-size: 1rem; }
 label.scope { display: grid; gap: 5px; max-width: 420px; margin: 0 0 22px; color: var(--muted); font-size: .9rem; }
 label.scope select { color: var(--ink); font-size: 1rem; }
-label.read-aloud { margin-top: 14px; }
+.prefs { display: grid; gap: 8px; margin-top: 14px; }
 .for-job { margin-top: 22px; }
 .for-job summary { cursor: pointer; color: var(--muted); }
 .for-job[open] summary { margin-bottom: 8px; }
