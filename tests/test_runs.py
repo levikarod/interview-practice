@@ -166,12 +166,12 @@ class TestEvents:
 
 class TestQuestions:
     def test_core_bank_loads(self):
-        bank = questions.load_questions()
+        bank = questions.load_core()
         assert len(bank) >= 20
         assert all(q.tags for q in bank), "every question needs retrieval tags"
 
     def test_ids_are_unique(self):
-        ids = [q.id for q in questions.load_questions()]
+        ids = [q.id for q in questions.load_core()]
         assert len(ids) == len(set(ids))
 
     def test_pick_avoids_questions_already_asked(self):
