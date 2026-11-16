@@ -55,7 +55,7 @@ from typing import Any, Protocol
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SANDBOX = REPO_ROOT / "runtime" / "sandbox"
 
-DEFAULT_MODEL = "claude-opus-5"
+DEFAULT_MODEL = "claude-haiku-5-5"
 TIMEOUT_SECONDS = 300
 NO_TOOLS = ""
 
